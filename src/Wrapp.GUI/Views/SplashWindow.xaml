@@ -1,0 +1,484 @@
+<ui:FluentWindow x:Class="Wrapp.Views.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:Wrapp"
+        Title="Wrapp"
+        Width="420" Height="380"
+        MinHeight="380"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/burrito.ico"
+        Background="{DynamicResource AppBgBrush}">
+
+    <ui:FluentWindow.Resources>
+        <!-- Base card style: default border with hover highlight -->
+        <Style x:Key="SplashCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- New Bundle: hover + click selection -->
+        <Style x:Key="NewBundleCard" TargetType="Border" BasedOn="{StaticResource SplashCard}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding SelectedActionKey}" Value="new">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Open Existing: hover + click selection -->
+        <Style x:Key="OpenExistingCard" TargetType="Border" BasedOn="{StaticResource SplashCard}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding SelectedActionKey}" Value="open">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Appease framework: hover + click selection -->
+        <Style x:Key="AppeaseCard" TargetType="Border" BasedOn="{StaticResource SplashCard}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding SelectedFrameworkKey}" Value="appease">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- PSADT framework: hover + click selection -->
+        <Style x:Key="PsadtCard" TargetType="Border" BasedOn="{StaticResource SplashCard}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding SelectedFrameworkKey}" Value="psadt">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBgBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Title bar -->
+        <ui:TitleBar Grid.Row="0" Title="Wrapp"/>
+
+        <!-- Row 1: Logo, title, version (pinned, never moves) -->
+        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,12,0,16">
+            <Image Source="/Assets/burrito.png"
+                   Width="72" Height="72"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,10"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
+            <TextBlock Text="Wrapp"
+                       FontSize="26" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,4"/>
+            <TextBlock Text="{x:Static local:AppInfo.VersionDisplay}"
+                       FontSize="13"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Back button (sits in left margin of Row 2, only visible during framework picker) -->
+        <TextBlock Grid.Row="2" Text="&#xE72B;"
+                   FontFamily="Segoe MDL2 Assets" FontSize="14"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   Cursor="Hand"
+                   HorizontalAlignment="Left" VerticalAlignment="Center"
+                   Margin="24,0,0,0"
+                   MouseLeftButtonDown="BackButton_Click"
+                   ToolTip="{StaticResource Help.Splash.Back}">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowFrameworkPicker}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- Row 2: Action area (main buttons OR framework picker, same card style) -->
+        <StackPanel x:Name="CardsArea" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Width="340" Margin="0,0,0,4">
+
+            <!-- Main action cards (hidden when framework picker or update mode is shown) -->
+            <StackPanel x:Name="MainButtonsPanel">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowFrameworkPicker}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsUpdateMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <!-- New Bundle card -->
+                <Border Style="{StaticResource NewBundleCard}"
+                        Margin="0,0,0,8"
+                        MouseLeftButtonDown="NewBundleCard_Click">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="22"
+                                   Foreground="{DynamicResource AccentBgBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="New Bundle" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Create a new application package"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Open Existing card -->
+                <Border Style="{StaticResource OpenExistingCard}"
+                        MouseLeftButtonDown="OpenExistingCard_Click">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="22"
+                                   Foreground="{DynamicResource AccentBgBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Open Existing Bundle" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Open a folder containing Config.json"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- Framework picker (shown after clicking New Bundle) -->
+            <StackPanel x:Name="FrameworkPickerPanel">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowFrameworkPicker}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <!-- Appease card -->
+                <Border Style="{StaticResource AppeaseCard}"
+                        Margin="0,0,0,8"
+                        ToolTip="{StaticResource Help.Splash.FrameworkAppease}"
+                        MouseLeftButtonDown="AppeaseCard_Click">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Image Source="/Assets/PowerShell-icon.png" Width="32" Height="32"
+                               VerticalAlignment="Center" Margin="0,0,12,0"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}">
+                                Appease <Run FontSize="11" FontWeight="Normal"
+                                             Foreground="{DynamicResource TextMutedBrush}">v2.3</Run>
+                            </TextBlock>
+                            <TextBlock Text="Separate Install, Uninstall, and Detect scripts"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- PSADT card -->
+                <Border Style="{StaticResource PsadtCard}"
+                        ToolTip="{StaticResource Help.Splash.FrameworkPsadt}"
+                        MouseLeftButtonDown="PsadtCard_Click">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Image Source="/Assets/PSADT-icon.png" Width="32" Height="32"
+                               VerticalAlignment="Center" Margin="0,0,12,0"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}">
+                                PSADT <Run FontSize="11" FontWeight="Normal"
+                                           Foreground="{DynamicResource TextMutedBrush}">v4.1.8</Run>
+                            </TextBlock>
+                            <TextBlock Text="Single Deploy script with Install, Uninstall, and Repair"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- Update mode: step list + honest progress; replaces the cards -->
+            <StackPanel x:Name="UpdatePanel">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsUpdateMode}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <!-- current → target version -->
+                <TextBlock Text="{Binding UpdateVersionLine}"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                <!-- download size (known from the feed check, before any
+                     download): the delta size when a delta chain exists,
+                     with the full package size it rebuilds locally -->
+                <TextBlock Text="{Binding UpdateDetailLine}"
+                           FontSize="11" TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           HorizontalAlignment="Center" Margin="20,0,20,2">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateDetailLine}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <!-- full feed-manifest hash, complete and wrappable for verification -->
+                <TextBlock Text="{Binding UpdateHashLine}"
+                           FontSize="10" FontFamily="Consolas"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" TextAlignment="Center"
+                           HorizontalAlignment="Center" Margin="20,0,20,10">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateHashLine}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- operator-action banner: the ONE moment the update needs the
+                     user - other Wrapp windows must close before the download.
+                     Deliberately louder than everything else on this screen. -->
+                <Border CornerRadius="6" BorderThickness="2" Padding="10,8" Margin="4,0,4,10"
+                        BorderBrush="{DynamicResource WarnBadgeBgBrush}"
+                        Background="{DynamicResource CardBgBrush}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateWaitingOnWindows}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                            <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{DynamicResource WarnBadgeBgBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Text="Close the other Wrapp windows to continue"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding UpdateWaitingDetail}"
+                                   FontSize="11" TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- step list -->
+                <ItemsControl ItemsSource="{Binding UpdateSteps}" Margin="60,0,0,10">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateProgressVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                <TextBlock Text="{Binding Glyph}" Width="20" FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBgBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Label}" FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- honest progress: real percent while downloading, indeterminate while rebuilding -->
+                <ProgressBar Height="6" Margin="20,0,20,10"
+                             Minimum="0" Maximum="100"
+                             Value="{Binding UpdatePercent, Mode=OneWay}"
+                             IsIndeterminate="{Binding UpdateIndeterminate}">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateProgressVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+
+                <!-- startup offer -->
+                <StackPanel>
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateOfferVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <ui:Button Content="Update now" Appearance="Primary"
+                                   Click="UpdateNow_Click" Margin="0,0,8,0"/>
+                        <ui:Button Content="Close Wrapp" Click="UpdateCloseApp_Click"/>
+                    </StackPanel>
+                    <TextBlock Text="Updating asks every other open Wrapp window to close first - each gets its normal save prompts. Downloading starts only after they've closed."
+                               FontSize="10"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               Margin="10,8,10,0"/>
+                </StackPanel>
+
+                <!-- cancel while running -->
+                <TextBlock Text="Cancel update" FontSize="11" Cursor="Hand"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           HorizontalAlignment="Center"
+                           TextDecorations="Underline"
+                           MouseLeftButtonDown="UpdateCancel_Click">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateProgressVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- failure exit (handoff path - no cards to fall back to) -->
+                <ui:Button Content="Close Wrapp" HorizontalAlignment="Center"
+                           Click="UpdateCloseApp_Click">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UpdateFailedVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                </ui:Button>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Row 3: Status text -->
+        <TextBlock Grid.Row="3"
+                   Text="{Binding StatusText}"
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   HorizontalAlignment="Center"
+                   Margin="12,4,12,8">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusText}" Value="">
+                            <Setter Property="Visibility" Value="Hidden"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                            <Setter Property="Foreground" Value="#E05C5C"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
+</ui:FluentWindow>

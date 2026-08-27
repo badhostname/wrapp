@@ -1,0 +1,185 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>Wrapp</RootNamespace>
+    <AssemblyName>Wrapp</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\burrito.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Workstream D: explicit entry point so the Velopack hook processor runs
+         before ANY app code (it may exit the process during install/update). -->
+    <StartupObject>Wrapp.Program</StartupObject>
+    <!-- WFAC010 fires because UseWindowsForms=true triggers the WinForms
+         analyzer, which insists on Application.SetHighDpiMode / the
+         ApplicationHighDpiMode property. Both are WinForms-only and do not
+         apply to WPF+WebView2; the manifest is the correct mechanism here
+         (WebView2Feedback#1 requires PerMonitorV2 set before any managed
+         code runs, which only the manifest path guarantees). -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- SemVer2 (Workstream D): the historical 4-digit BUILD counter continues
+         as PATCH. 0.6.0.0295 (last 4-part version) -> 0.6.296. Velopack orders
+         releases by this version and rejects 4-part versions outright. -->
+    <VersionPrefix>1.0.4</VersionPrefix>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <SatelliteResourceLanguages>en;fr</SatelliteResourceLanguages>
+    <!-- Supply chain: pin every restored package's content hash in
+         packages.lock.json (committed). CI restores in locked mode
+         (restore /p:RestoreLockedMode=true) so a tampered or changed
+         same-version package fails the build. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Wrapp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\burrito.ico" />
+    <Resource Include="Assets\burrito.png" />
+    <Resource Include="Assets\PowerShell-icon.png" />
+    <Resource Include="Assets\PSADT-icon.png" />
+  </ItemGroup>
+
+  <!-- Bundled Monaco editor (offline, no CDN dependency) -->
+  <ItemGroup>
+    <Content Include="Assets\monaco\vs\**" CopyToOutputDirectory="PreserveNewest" Link="monaco\vs\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Host pages served from the monaco.local virtual host (Workstream G1/G5:
+         real origin + strict CSP instead of NavigateToString inline HTML) -->
+    <Content Include="Assets\monaco\*.html;Assets\monaco\*.js" CopyToOutputDirectory="PreserveNewest" Link="monaco\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Org-specific defaults: local (gitignored) takes priority, example (tracked) is the fallback -->
+  <ItemGroup>
+    <None Include="defaults.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('defaults.local.json')" />
+    <None Include="defaults.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.0" />
+    <PackageReference Include="WPF-UI" Version="4.2.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.18" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.87.0" />
+    <PackageReference Include="Microsoft.Identity.Client.Broker" Version="4.87.0" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.87.0" />
+    <PackageReference Include="Git-Windows-Minimal" Version="2.55.0.3" GeneratePathProperty="true" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Workstream D5: the changelog rides inside the assembly so the
+         What's-New popup works for every update path (Velopack, MSI push,
+         manual copy) with no loose file or network dependency. -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" Link="CHANGELOG.md" LogicalName="Wrapp.CHANGELOG.md" />
+    <!-- Script templates (bootstrapped to %LOCALAPPDATA%\Wrapp\Templates on first run) -->
+    <EmbeddedResource Include="Templates\Install\*.ps1" />
+    <EmbeddedResource Include="Templates\Uninstall\*.ps1" />
+    <!-- PSADT deploy script templates -->
+    <EmbeddedResource Include="Templates\PSADT\*.ps1" />
+    <!-- Package, assignment, deployment templates -->
+    <EmbeddedResource Include="Templates\Packages\Intune\*.json" />
+    <EmbeddedResource Include="Templates\Packages\SCCM\*.json" />
+    <EmbeddedResource Include="Templates\Assignments\*.json" />
+    <EmbeddedResource Include="Templates\Deployments\*.json" />
+  </ItemGroup>
+
+  <!-- Copy bundled MinGit to output directory -->
+  <Target Name="CopyMinGit" AfterTargets="Build">
+    <ItemGroup>
+      <MinGitFiles Include="$(PkgGit-Windows-Minimal)\tools\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MinGitFiles)" DestinationFolder="$(OutputPath)mingit\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyMinGitPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <MinGitFilesPublish Include="$(PkgGit-Windows-Minimal)\tools\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MinGitFilesPublish)" DestinationFolder="$(PublishDir)mingit\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy Appease template to output directory (vendored in modules/) -->
+  <Target Name="CopyAppease" AfterTargets="Build">
+    <ItemGroup>
+      <AppeaseFiles Include="$(ProjectDir)..\..\modules\appease-template\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AppeaseFiles)" DestinationFolder="$(OutputPath)appease-template\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyAppeasePublish" AfterTargets="Publish">
+    <ItemGroup>
+      <AppeaseFilesPublish Include="$(ProjectDir)..\..\modules\appease-template\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AppeaseFilesPublish)" DestinationFolder="$(PublishDir)appease-template\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy PSADT v4 template to output directory (vendored in modules/) -->
+  <Target Name="CopyPSADT" AfterTargets="Build">
+    <ItemGroup>
+      <PSADTFiles Include="$(ProjectDir)..\..\modules\psadt-template\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PSADTFiles)" DestinationFolder="$(OutputPath)psadt-template\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyPSADTPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <PSADTFilesPublish Include="$(ProjectDir)..\..\modules\psadt-template\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PSADTFilesPublish)" DestinationFolder="$(PublishDir)psadt-template\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy Wrapp.Packager module to output directory (vendored in modules/).
+       The destination is REMOVED first so renamed/deleted module files can't
+       linger in the output: the psm1 dot-sources every Public/Private .ps1 it
+       finds, so a stale pre-rename file would load a zombie function beside
+       its renamed successor. -->
+  <Target Name="CopyWrappPackager" AfterTargets="Build">
+    <RemoveDir Directories="$(OutputPath)Modules\Wrapp.Packager" />
+    <ItemGroup>
+      <WrappPackagerFiles Include="$(ProjectDir)..\..\modules\Wrapp.Packager\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WrappPackagerFiles)"
+          DestinationFolder="$(OutputPath)Modules\Wrapp.Packager\%(RecursiveDir)" />
+  </Target>
+
+  <Target Name="CopyWrappPackagerPublish" AfterTargets="Publish">
+    <RemoveDir Directories="$(PublishDir)Modules\Wrapp.Packager" />
+    <ItemGroup>
+      <WrappPackagerFilesPublish Include="$(ProjectDir)..\..\modules\Wrapp.Packager\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WrappPackagerFilesPublish)"
+          DestinationFolder="$(PublishDir)Modules\Wrapp.Packager\%(RecursiveDir)" />
+  </Target>
+
+  <!-- Copy IntuneWin32App module to output directory (vendored in modules/) -->
+  <Target Name="CopyIntuneWin32App" AfterTargets="Build">
+    <ItemGroup>
+      <IntuneWin32AppFiles Include="$(ProjectDir)..\..\modules\IntuneWin32App\1.5.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(IntuneWin32AppFiles)"
+          DestinationFolder="$(OutputPath)Modules\IntuneWin32App\1.5.0\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyIntuneWin32AppPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <IntuneWin32AppFilesPublish Include="$(ProjectDir)..\..\modules\IntuneWin32App\1.5.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(IntuneWin32AppFilesPublish)"
+          DestinationFolder="$(PublishDir)Modules\IntuneWin32App\1.5.0\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

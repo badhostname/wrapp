@@ -1,0 +1,10 @@
+{
+  "TemplateName": "Available - All Users",
+  "Description": "Available deployment to All Users collection for self-service",
+  "Collection": "All Users",
+  "DeployAction": "Install",
+  "DeployPurpose": "Available",
+  "UserNotification": "DisplayAll",
+  "TimeBaseOn": "LocalTime",
+  "AvailableDateTime": "2099-12-25T00:00:00.000Z"
+}

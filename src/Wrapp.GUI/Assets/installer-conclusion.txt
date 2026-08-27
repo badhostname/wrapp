@@ -1,0 +1,3 @@
+Wrapp has been installed.
+
+On first launch you'll be asked to load your organization's defaults file, or to continue with the built-in examples. You can change this later in Settings > Updates.
