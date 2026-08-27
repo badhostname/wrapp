@@ -1,0 +1,176 @@
+{
+  "_comment": [
+    "DOCUMENTATION ONLY -- this example file is NEVER loaded or seeded.",
+    "To ship org defaults: copy this file to defaults.local.json next to",
+    "Wrapp.exe and fill in real values. defaults.local.json is gitignored",
+    "and never committed; your internal release pipeline should drop it",
+    "into the publish folder.",
+    "",
+    "SEEDING SEMANTICS: tenants/sites/domains seed whenever the matching",
+    "settings section is empty. Everything else (Vault, Endpoint, the",
+    "*Defaults blocks) seeds ONCE per user profile, on the first launch",
+    "that sees the file, and only into fields still at factory defaults --",
+    "a technician's own settings are never overwritten. Ship the file WITH",
+    "the app so it is present at first launch.",
+    "",
+    "SensitivePatterns are case-insensitive regexes scrubbed from every",
+    "log line (shown as ***ORG-REDACTED***) -- list tenant GUIDs, server",
+    "names, and internal domains here.",
+    "",
+    "NOT seedable by design: client secrets (DPAPI per-user -- technicians",
+    "paste once, or use AuthFlow ClientCert with a deployed certificate),",
+    "the key-vault URL trust approval (each technician approves the",
+    "vault URL once even when it is pre-filled here), and the update-feed",
+    "trust approval (Update.FeedUrl pre-fills, but each technician approves",
+    "it once before any update is fetched -- updates are executable code).",
+    "",
+    "Org TEMPLATES are a separate mechanism: put .ps1/.json files in an",
+    "org-templates\\ folder next to Wrapp.exe, mirroring the Templates",
+    "layout (Scripts\\Install, Scripts\\Uninstall, Scripts\\PSADT,",
+    "Packages\\Intune, Packages\\SCCM, Assignments, Deployments). They ship",
+    "into each profile like built-ins: protected in the pickers, refreshed",
+    "on pack updates unless the technician edited their copy."
+  ],
+
+  "IntuneTenants": [
+    {
+      "Key": "00000000-0000-0000-0000-000000000001",
+      "Name": "My Dev Tenant",
+      "Comment": "Development/test tenant",
+      "ClientID": "",
+      "AuthFlow": "Interactive"
+    },
+    {
+      "Key": "00000000-0000-0000-0000-000000000002",
+      "Name": "My Prod Tenant",
+      "Comment": "Production tenant",
+      "ClientID": "",
+      "AuthFlow": "Interactive"
+    }
+  ],
+
+  "SCCMSites": [
+    {
+      "Key": "ABC",
+      "Comment": "Production SCCM site",
+      "AppFolder": "ABC:\\Application",
+      "DeploymentGroups": ["Group A", "Group B"]
+    }
+  ],
+
+  "Domains": [
+    {
+      "Key": "PROD.CONTOSO.COM",
+      "IsDistPath": "\\\\fileserver\\Applications",
+      "AppFolder": "Vendor\\AppName",
+      "TagFolder": "\\\\fileserver\\Tag"
+    }
+  ],
+
+  "SensitivePatterns": [
+    "00000000-0000-0000-0000-000000000001",
+    "CONTOSO\\.COM",
+    "fileserver"
+  ],
+
+  "Placeholders": [
+    { "Name": "pilotgroup",  "Value": "00000000-0000-0000-0000-0000000000AA", "Comment": "Intune pilot ring group id -- use as {{pilotgroup}}" },
+    { "Name": "distshare",   "Value": "\\\\fileserver\\dist$", "Comment": "Distribution share root" },
+    { "Name": "svcaccount",  "IsSensitive": true, "Comment": "Sensitive: declared name-only; each technician sets the value once in Settings > Placeholders (stored DPAPI-encrypted per machine)" }
+  ],
+
+  "Vault": {
+    "KeyVaultRepoUrl": "https://dev.azure.com/contoso/Packaging/_git/wrapp-keys",
+    "EnableAzureDevOpsKeyVault": true,
+    "KeyVaultPathTemplate": "/wrapp/{Tenant}/{AppId}.json",
+    "KeyVaultManualPathTemplate": "/manual/{PackageName}.json",
+    "KeyVaultUsePullRequests": false,
+    "KeyVaultPrSourceBranchTemplate": "wrapp-keys/{Date}/{AppId}",
+    "KeyVaultPrTitleTemplate": "Wrapp: encryption keys for {AppName} ({AppId})",
+    "KeyVaultPrDescriptionTemplate": "Automated key drop from Wrapp.\\nApp: {AppName}\\nTenant: {Tenant}"
+  },
+
+  "Endpoint": {
+    "TagFolder": "C:\\Contoso\\Tag",
+    "LocalAppFolder": "C:\\Contoso\\Apps"
+  },
+
+  "Update": {
+    "FeedUrl": "\\\\fileserver\\wrapp-updates",
+    "Mode": "Auto"
+  },
+
+  "IntunePackageDefaults": {
+    "Architecture": "x64",
+    "MinimumSupportedWindowsRelease": "W11_21H2",
+    "InstallExperience": "system",
+    "RestartBehavior": "basedOnReturnCode",
+    "MaximumInstallationTimeInMinutes": 60,
+    "AllowAvailableUninstall": true,
+    "CompanyPortalFeaturedApp": false,
+    "UseAzCopy": false,
+    "AzCopyWindowStyle": "Hidden",
+    "UpdateMode": "Create"
+  },
+
+  "IntuneMetadataDefaults": {
+    "AppNameTemplate": "{{Company}} {{Name}} {{DotVersion}}",
+    "DeveloperTemplate": "{{Company}}",
+    "OwnerTemplate": "IT Packaging Team",
+    "CommentTemplate": "Packaged {{Date}} by {{Author}}",
+    "InformationURL": "",
+    "PrivacyURL": ""
+  },
+
+  "IntuneAssignmentDefaults": {
+    "Intent": "required",
+    "Type": "Group",
+    "GroupMode": "include",
+    "Notification": "showReboot",
+    "DeliveryOptimizationPriority": "foreground",
+    "AvailableTime": "",
+    "DeadlineTime": "",
+    "FilterMode": "",
+    "EnableRestartGracePeriod": false,
+    "RestartGracePeriodInMinutes": 0,
+    "RestartCountDownDisplayInMinutes": 0,
+    "RestartNotificationSnoozeInMinutes": 0
+  },
+
+  "SccmPackageDefaults": {
+    "InstallationBehaviorType": "InstallForSystem",
+    "LogonRequirementType": "WhetherOrNotUserLoggedOn",
+    "UserInteractionMode": "Hidden",
+    "RebootBehavior": "BasedOnExitCode",
+    "SlowNetworkDeploymentMode": "DoNothing",
+    "EstimatedRuntimeMins": 15,
+    "MaximumAllowedRuntimeMins": 120,
+    "InstallBehavior": false,
+    "ContentFallback": false
+  },
+
+  "SccmMetadataDefaults": {
+    "PublisherTemplate": "{{Company}}",
+    "OwnerTemplate": "IT Packaging Team",
+    "SupportContactTemplate": "servicedesk@contoso.com",
+    "DescriptionTemplate": "",
+    "CommentTemplate": "Packaged {{Date}} by {{Author}}",
+    "NameTemplate": "",
+    "LocalizedNameTemplate": "",
+    "LocalizedDescriptionTemplate": "",
+    "KeywordsTemplate": "",
+    "PrivacyUrl": "",
+    "UserDocumentation": "",
+    "LinkText": "",
+    "ReleaseDateTemplate": ""
+  },
+
+  "SccmDeploymentDefaults": {
+    "DeployAction": "Install",
+    "DeployPurpose": "Required",
+    "UserNotification": "DisplaySoftwareCenterOnly",
+    "TimeBaseOn": "LocalTime",
+    "AvailableDateTime": "",
+    "DeadlineDateTime": ""
+  }
+}

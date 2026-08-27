@@ -1,0 +1,50 @@
+<UserControl x:Class="Wrapp.Views.MsiIconPickerDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="520">
+
+    <StackPanel Margin="0,0,0,8">
+
+        <!-- Explanation text -->
+        <TextBlock TextWrapping="Wrap" FontSize="12"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Margin="0,0,0,12"
+                   Text="This MSI contains embedded icons. Select the icon you want to use for this package."/>
+
+        <!-- Icon grid -->
+        <ItemsControl x:Name="IconList">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border x:Name="IconBorder"
+                            Width="120" Height="130"
+                            CornerRadius="8"
+                            BorderThickness="3"
+                            BorderBrush="{DynamicResource AppBorderBrush}"
+                            Background="{DynamicResource CardBgBrush}"
+                            Cursor="Hand"
+                            Margin="4"
+                            MouseLeftButtonDown="IconItem_Click">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Image Source="{Binding Icon}"
+                                   Width="80" Height="80" Stretch="Uniform"
+                                   HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       Margin="4,4,4,0"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="110"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>

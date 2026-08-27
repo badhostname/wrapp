@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                           revision="1.0" schemaVersion="1.0">
+  <displayName>Wrapp</displayName>
+  <description>Enterprise policy for the Wrapp packaging tool.</description>
+  <resources>
+    <stringTable>
+      <string id="SupportedWrapp">Wrapp 1.0.0 or later</string>
+      <string id="Cat_Wrapp">Wrapp</string>
+      <string id="Cat_Updates">Updates</string>
+      <string id="Cat_KeyVault">Key Vault</string>
+      <string id="Cat_Endpoints">Endpoints</string>
+      <string id="Cat_Bundle">Bundle output</string>
+      <string id="Cat_Provisioning">Provisioning</string>
+      <string id="Cat_Appearance">Appearance</string>
+      <string id="Cat_Interface">Interface</string>
+      <string id="Cat_Diagnostics">Diagnostics</string>
+
+      <string id="UpdateFeedUrl">Update feed URL</string>
+      <string id="UpdateFeedUrl_Explain">The Velopack release feed Wrapp checks for application updates (https, UNC share, or local path — plain http is rejected). Updates are executable code: a MACHINE-scope mandate is trusted without the per-user approval prompt; a USER-scope mandate still requires it. When enabled, the value is enforced and the Settings control is disabled.</string>
+      <string id="UpdateMode">Update mode</string>
+      <string id="UpdateMode_Explain">How Wrapp behaves at launch: Auto (check and offer/enforce at the splash), NotifyOnly (indicator only — for fleets updated via Intune/SCCM supersedence), Disabled (no automatic checks).</string>
+      <string id="UpdateMode_Auto">Auto</string>
+      <string id="UpdateMode_NotifyOnly">Notify only</string>
+      <string id="UpdateMode_Disabled">Disabled</string>
+
+      <string id="KeyVaultRepoUrl">Key Vault repository URL</string>
+      <string id="KeyVaultRepoUrl_Explain">The Azure DevOps repository that receives encryption keys for packaged apps. Must be https. A MACHINE-scope mandate is trusted without the per-user approval prompt; USER scope still prompts.</string>
+      <string id="EnableAzureDevOpsKeyVault">Enable Azure DevOps Key Vault</string>
+      <string id="EnableAzureDevOpsKeyVault_Explain">Master switch for all Key Vault reads and writes. Disabled = the vault feature is off fleet-wide and its controls are locked.</string>
+      <string id="KeyVaultUsePullRequests">Push keys via pull requests</string>
+      <string id="KeyVaultUsePullRequests_Explain">When enabled, keys are pushed on a branch and a pull request is opened instead of committing directly — required for repos with branch protection.</string>
+      <string id="KeyVaultPathTemplate">Key path template (automatic)</string>
+      <string id="KeyVaultPathTemplate_Explain">Repository path template for auto-captured keys, e.g. /wrapp/{Tenant}/{AppId}.json.</string>
+      <string id="KeyVaultManualPathTemplate">Key path template (manual)</string>
+      <string id="KeyVaultManualPathTemplate_Explain">Repository path template for manually saved keys, e.g. /manual/{PackageName}.json.</string>
+
+      <string id="EndpointTagFolder">Endpoint tag folder</string>
+      <string id="EndpointTagFolder_Explain">On-endpoint folder for detection tags and transcripts. This path is baked into scripts that run on every managed endpoint — mandate it.</string>
+      <string id="EndpointLocalAppFolder">Endpoint local app folder</string>
+      <string id="EndpointLocalAppFolder_Explain">On-endpoint root folder for per-app local assets. Baked into generated scripts.</string>
+
+      <string id="PsadtTemplatePath">PSADT template path</string>
+      <string id="PsadtTemplatePath_Explain">Path to the extracted PSADT v4 framework template folder used when creating PSADT bundles.</string>
+      <string id="DirectoryFormat">Bundle directory format</string>
+      <string id="DirectoryFormat_Explain">Naming template for bundle output subdirectories, e.g. {Company}\{Name}\{Version}.</string>
+      <string id="IconFolderName">Bundle icon folder name</string>
+      <string id="IconFolderName_Explain">Name of the folder inside each bundle that holds the app icon.</string>
+
+      <string id="Theme">Theme</string>
+      <string id="Theme_Explain">UI theme: Dark, Light, or the name of a custom theme (see 'Custom theme file'). When mandated, the theme picker is locked.</string>
+      <string id="ThemeFilePath">Custom theme file</string>
+      <string id="ThemeFilePath_Explain">Full path to an organization .wrapptheme.json (JSON color overlay on Dark or Light — data only, never code). The theme appears in the picker; combine with the Theme policy to enforce it.</string>
+
+      <string id="OrgDefaultsPath">Organization defaults file</string>
+      <string id="OrgDefaultsPath_Explain">Full path to the organization defaults JSON (tenants, sites, domains, placeholders, seeded preferences). Checked before all built-in locations.</string>
+      <string id="DisableSettingsImport">Disable settings import</string>
+      <string id="DisableSettingsImport_Explain">Hides the Export/Import settings card and blocks the import command.</string>
+      <string id="DisableOrgDefaultsImport">Disable organization-defaults import</string>
+      <string id="DisableOrgDefaultsImport_Explain">Hides the organization-defaults import card and blocks the import command.</string>
+
+      <string id="VerboseUiTrace">Verbose UI tracing</string>
+      <string id="VerboseUiTrace_Explain">Forces the [TRACE] UI-interaction logging on or off and locks the toggle.</string>
+
+      <string id="Placeholders">Custom placeholders</string>
+      <string id="Placeholders_Explain">Provisions custom {{Name}} placeholders (value name = placeholder name, value = its expansion). Always non-sensitive: sensitive placeholder values are per-user encrypted and cannot be provisioned via policy. Enforced on every launch and save; a user's sensitive placeholder of the same name is never overwritten. For Intune tenants, SCCM sites and domains use the registry keyed lists (IntuneTenants\, SccmSites\, Domains\ subkeys) or Apply-WrappPolicy.ps1 — see docs/policy-admin-guide.md.</string>
+      <string id="RedactionPatterns">Log redaction patterns</string>
+      <string id="RedactionPatterns_Explain">Additional regular expressions scrubbed from every Wrapp log line (value name = a label, value = the regex). Merged with the organization defaults file's patterns.</string>
+      <string id="HiddenSections">Hidden navigation sections</string>
+      <string id="HiddenSections_Explain">Hides entire views from the navigation rail. Value names: Intune, SCCM, Detection, Scripts, ConfigJson, Run, Inventory, Tools, Logs, GitHistory (each with data 1). Settings and General can never be hidden.</string>
+      <string id="HiddenSettingsTabs">Hidden Settings tabs</string>
+      <string id="HiddenSettingsTabs_Explain">Hides tabs inside the Settings view. Value names: Bundle, Domains, Endpoint, Intune, SCCM, KeyVault, Updates, Placeholders, Provisioning (each with data 1).</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="TextPres_UpdateFeedUrl"><textBox refId="UpdateFeedUrl_Text"><label>Feed URL:</label></textBox></presentation>
+      <presentation id="DropPres_UpdateMode"><dropdownList refId="UpdateMode_Enum" defaultItem="0">Mode:</dropdownList></presentation>
+      <presentation id="TextPres_KeyVaultRepoUrl"><textBox refId="KeyVaultRepoUrl_Text"><label>Repository URL:</label></textBox></presentation>
+      <presentation id="TextPres_KeyVaultPathTemplate"><textBox refId="KeyVaultPathTemplate_Text"><label>Path template:</label></textBox></presentation>
+      <presentation id="TextPres_KeyVaultManualPathTemplate"><textBox refId="KeyVaultManualPathTemplate_Text"><label>Path template:</label></textBox></presentation>
+      <presentation id="TextPres_EndpointTagFolder"><textBox refId="EndpointTagFolder_Text"><label>Folder:</label></textBox></presentation>
+      <presentation id="TextPres_EndpointLocalAppFolder"><textBox refId="EndpointLocalAppFolder_Text"><label>Folder:</label></textBox></presentation>
+      <presentation id="TextPres_PsadtTemplatePath"><textBox refId="PsadtTemplatePath_Text"><label>Path:</label></textBox></presentation>
+      <presentation id="TextPres_DirectoryFormat"><textBox refId="DirectoryFormat_Text"><label>Format:</label></textBox></presentation>
+      <presentation id="TextPres_IconFolderName"><textBox refId="IconFolderName_Text"><label>Folder name:</label></textBox></presentation>
+      <presentation id="TextPres_Theme"><textBox refId="Theme_Text"><label>Theme name:</label></textBox></presentation>
+      <presentation id="TextPres_ThemeFilePath"><textBox refId="ThemeFilePath_Text"><label>Theme file path:</label></textBox></presentation>
+      <presentation id="TextPres_OrgDefaultsPath"><textBox refId="OrgDefaultsPath_Text"><label>Defaults file path:</label></textBox></presentation>
+      <presentation id="ListPres_Placeholders"><listBox refId="Placeholders_List">Placeholders (name = value):</listBox></presentation>
+      <presentation id="ListPres_RedactionPatterns"><listBox refId="RedactionPatterns_List">Patterns (label = regex):</listBox></presentation>
+      <presentation id="ListPres_HiddenSections"><listBox refId="HiddenSections_List">Hidden sections:</listBox></presentation>
+      <presentation id="ListPres_HiddenSettingsTabs"><listBox refId="HiddenSettingsTabs_List">Hidden tabs:</listBox></presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

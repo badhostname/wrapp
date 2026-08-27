@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Pre-commit hook: blocks commits that contain org-specific sensitive strings.
+#
+# Reads patterns from defaults.local.json's "SensitivePatterns" array and
+# checks all staged file contents against them. Binary files are skipped.
+#
+# Install: git config core.hooksPath .githooks
+# (already set by the repo setup script)
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+# Locate defaults.local.json relative to the repo root
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+LOCAL_DEFAULTS="$REPO_ROOT/src/Wrapp.GUI/defaults.local.json"
+
+if [ ! -f "$LOCAL_DEFAULTS" ]; then
+    # No local defaults = no sensitive patterns to check against
+    exit 0
+fi
+
+# Extract patterns from the JSON file (portable: no jq dependency).
+# Grabs lines between the array start and its closing bracket, strips
+# quotes and commas, skips blank lines and the key name itself.
+PATTERNS=$(sed -n '/"SensitivePatterns"/,/\]/p' "$LOCAL_DEFAULTS" \
+    | grep '"' \
+    | sed 's/.*"\(.*\)".*/\1/' \
+    | grep -v '^$' \
+    | grep -vi 'SensitivePatterns')
+
+if [ -z "$PATTERNS" ]; then
+    exit 0
+fi
+
+FOUND=0
+
+# Check only staged (cached) content, not the working tree
+while IFS= read -r pattern; do
+    # Use git grep on the staged index (-c for cached, --no-ext-diff)
+    MATCHES=$(git diff --cached --diff-filter=ACMR -U0 \
+        | grep -iE "$pattern" \
+        | grep -v 'defaults\.local\.json' \
+        | grep -v 'defaults\.example\.json' \
+        | grep -v '\.githooks/' \
+        | head -5) || true
+
+    if [ -n "$MATCHES" ]; then
+        if [ "$FOUND" -eq 0 ]; then
+            echo -e "${RED}BLOCKED:${NC} Staged files contain sensitive org-specific strings."
+            echo -e "${YELLOW}These patterns are defined in defaults.local.json -> SensitivePatterns.${NC}"
+            echo ""
+        fi
+        echo -e "  ${RED}Pattern:${NC} $pattern"
+        echo "$MATCHES" | head -3 | sed 's/^/    /'
+        echo ""
+        FOUND=1
+    fi
+done <<< "$PATTERNS"
+
+if [ "$FOUND" -eq 1 ]; then
+    echo -e "${YELLOW}Move the sensitive values to defaults.local.json (gitignored) and remove them from source files.${NC}"
+    echo -e "${YELLOW}To bypass this check (emergency only): git commit --no-verify${NC}"
+    exit 1
+fi
+
+exit 0

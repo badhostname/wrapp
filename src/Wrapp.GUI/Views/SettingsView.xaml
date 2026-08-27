@@ -1,0 +1,2193 @@
+﻿<UserControl x:Class="Wrapp.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:ctrl="clr-namespace:Wrapp.Controls"
+             xmlns:helpers="clr-namespace:Wrapp.Helpers"
+             xmlns:local="clr-namespace:Wrapp"
+             xmlns:svc="clr-namespace:Wrapp.Services">
+
+    <UserControl.Resources>
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid.Resources>
+            <!-- Settings navigation: a fixed-width rail on the left, a hairline
+                 divider, then the section content — the same shape as the Intune
+                 packages view (list | divider | detail). WPF's stock left-strip
+                 TabControl layout lets the strip claim the full width, so the
+                 control gets an explicit template instead. -->
+            <Style x:Key="SettingsNavTabControl" TargetType="TabControl">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabControl">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="196" MinWidth="150"/>
+                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ScrollViewer Grid.Column="0"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              helpers:SmoothScroll.Enabled="True">
+                                    <TabPanel IsItemsHost="True" Margin="0,8"/>
+                                </ScrollViewer>
+                                <Border Grid.Column="1" Background="{DynamicResource AppBorderBrush}"/>
+                                <ContentPresenter Grid.Column="2" ContentSource="SelectedContent"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Nav item. The app-wide TabItem style targets TOP tabs (bottom
+                 underline indicator); this overrides it with a left accent bar
+                 and a full-width, left-aligned label. -->
+            <Style x:Key="SettingsNavTab" TargetType="TabItem">
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <!-- Cursor lives on NavBorder (the header), NOT the TabItem:
+                     a TabItem's Cursor leaks to its hosted tab CONTENT via the
+                     logical-tree event route, turning the whole page's cursor
+                     into a hand (same gotcha ToolsView overrides with
+                     Cursor=Arrow on its TabItem style). -->
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="NavBorder" Background="Transparent"
+                                    BorderBrush="Transparent" BorderThickness="3,0,0,0"
+                                    Padding="12,9" Margin="0,1" Cursor="Hand">
+                                <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource HoverBgBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource SelectedBgBrush}"/>
+                                    <Setter TargetName="NavBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Grid.Resources>
+
+        <!-- View header: title + info help + right-side path & explorer shortcut.
+             Matches LogsView header styling for consistency across the app. -->
+        <ctrl:ViewHeader Grid.Row="0"
+                         Title="Settings"
+                         HelpKey="Help.Settings.Overview">
+            <ctrl:ViewHeader.RightContent>
+                <StackPanel Orientation="Horizontal">
+                    <!-- Export/import live in the Provisioning tab, not here: two
+                         entry points for one action is how the org-defaults
+                         button ended up lost at the bottom of Updates. -->
+                    <!-- The app's standard path row: ellipsed Consolas text +
+                         open-in-Explorer and copy-path icons. -->
+                    <ctrl:PathActionsRow Path="{Binding SettingsPath}"
+                                         MaxWidth="420" VerticalAlignment="Center"/>
+                    <!-- Enterprise policy indicator — styled like the General
+                         view's "Tip:" banner (CardBg fill, Accent border,
+                         CornerRadius 4) rather than a pill, so it reads as
+                         part of the app's banner family. Details live in
+                         Provisioning > Effective configuration. -->
+                    <Border Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="1" CornerRadius="4"
+                            Padding="8,2" Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            ToolTip="{StaticResource Help.Settings.ManagedByOrg}"
+                            Visibility="{Binding AnyPolicyManaged, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE821;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                <Run FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}">Managed</Run>
+                                <Run> by your organization</Run>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ctrl:ViewHeader.RightContent>
+        </ctrl:ViewHeader>
+
+        <!-- Settings are grouped into a left nav instead of one long scroll:
+             each area scrolls independently and is reachable in one click. -->
+        <TabControl Grid.Row="1" TabStripPlacement="Left"
+                    Style="{StaticResource SettingsNavTabControl}"
+                    Background="Transparent" BorderThickness="0"
+                    Padding="0">
+
+            <TabItem Style="{StaticResource SettingsNavTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="General" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[General]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionHeader Title="Preferences"
+                                                    HelpKey="Help.Settings.General"
+                                                    Margin="0,0,0,-12"/>
+                                <TextBlock Text="Customize the application theme and appearance."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="Theme" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.Theme}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox ItemsSource="{Binding ThemeOptions}"
+                                      SelectedItem="{Binding SelectedTheme}"
+                                      IsEnabled="{Binding Policy[Theme].IsEditable}"
+                                      ToolTip="{Binding Policy[Theme].Reason}"
+                                      Width="160" HorizontalAlignment="Left"/>
+                            <Button Command="{Binding ImportThemeCommand}"
+                                    IsEnabled="{Binding Policy[Theme].IsEditable}"
+                                    Margin="8,0,0,0" Padding="10,4"
+                                    ToolTip="Import a .wrapptheme.json color theme (validated against the theme key catalog; JSON colors only — never code).">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B5;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Import theme" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Text="Custom themes are JSON color overlays on Dark or Light, stored in %LOCALAPPDATA%\Wrapp\Themes."
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Bundle]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Bundle" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Bundle]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionHeader Title="Bundle Output"
+                                                    HelpKey="Help.Settings.Bundle"
+                                                    Margin="0,0,0,-12"/>
+                                <TextBlock Text="Configure where bundles are saved and how folders are structured."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Directory Format -->
+                        <TextBlock Text="Directory Format" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.DirectoryFormat}"/>
+                        <ui:TextBox Text="{Binding DirectoryFormat, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[DirectoryFormat].IsEditable}"
+                                    PlaceholderText="{}{Company}\{Name}\{Version}"
+                                    Margin="0,0,0,6"/>
+                        <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"
+                                   Text="Tokens: {Company}  {Name}  {Version}  {DotVersion}  {Language}"/>
+                        <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Preview: " FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DirectoryPreview}"
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#4ec9b0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Icon Folder Name -->
+                        <TextBlock Text="Icon Folder Name" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.IconFolderName}"/>
+                        <ui:TextBox Text="{Binding IconFolderName, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[IconFolderName].IsEditable}"
+                                    PlaceholderText="Icon"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12"
+                                   Text="Subfolder created inside each bundle for the extracted icon PNG."/>
+
+                        <!-- PSADT Template Path -->
+                        <TextBlock Text="PSADT v4 Template Path" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.PsadtTemplatePath}"/>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding PsadtTemplatePath, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[PsadtTemplatePath].IsEditable}"
+                                        IsReadOnly="True"
+                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                        PlaceholderText="Using bundled PSADT v4.1.8 (override to use a different version)"/>
+                            <Button Grid.Column="2" Padding="12,5"
+                                    ToolTip="{StaticResource Help.Settings.PsadtTemplatePath}"
+                                    Command="{Binding BrowsePsadtTemplateCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Browse..." VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12"
+                                   Text="Folder containing the extracted PSAppDeployToolkit v4 template (Invoke-AppDeployToolkit.ps1, PSAppDeployToolkit/, etc.)"/>
+
+                        <!-- Reset buttons -->
+                        <WrapPanel Margin="0,4,0,0">
+                            <Button Content="Reset Defaults"
+                                    Command="{Binding ResetDefaultsCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    ToolTip="{StaticResource Help.Settings.Reset.BundleOutput}"/>
+                            <Button Content="Reset Templates"
+                                    Command="{Binding ResetTemplatesCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    ToolTip="{StaticResource Help.Settings.Reset.Templates}"/>
+                            <Button Content="Reset Intune Tenants"
+                                    Command="{Binding ResetIntuneTenantsCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    ToolTip="{StaticResource Help.Settings.Reset.IntuneTenants}"/>
+                            <Button Content="Reset SCCM Sites"
+                                    Command="{Binding ResetSccmSitesCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    ToolTip="{StaticResource Help.Settings.Reset.SccmSites}"/>
+                            <Button Content="Reset Domains"
+                                    Command="{Binding ResetDomainsCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    ToolTip="{StaticResource Help.Settings.Reset.Domains}"/>
+                            <Button Content="Reset All Settings"
+                                    Command="{Binding ResetAllSettingsCommand}"
+                                    Padding="12,8" Margin="0,0,8,8"
+                                    Foreground="#C84A4A"
+                                    ToolTip="{StaticResource Help.Settings.Reset.All}"/>
+                        </WrapPanel>
+
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Domains]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE968;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Domains" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Domains]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE968;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Domains" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Text="Distribution paths and folder conventions per domain. New bundles inherit this list."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+                        <ctrl:SectionHeader Title="Domains"
+                                            HelpKey="Help.Settings.Preferences.Domains"/>
+                        <DataGrid ItemsSource="{Binding Preferences.Domains}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  Margin="0,0,0,6">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPolicyManaged}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="ToolTip" Value="Provisioned by your organization's policy - this entry cannot be modified or removed."/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Resources>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="" Width="28" IsReadOnly="True" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          Visibility="{Binding IsPolicyManaged, Converter={StaticResource InverseBoolToVis}}"/>
+                                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           ToolTip="Provisioned by your organization's policy - this entry cannot be modified or removed."
+                                                           ToolTipService.ShowOnDisabled="True"
+                                                           Visibility="{Binding IsPolicyManaged, Converter={StaticResource BoolToVis}}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="180">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Key" ToolTip="{StaticResource Help.Settings.Domains.Key}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Domains.Key}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="260">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="IsDistPath" ToolTip="{StaticResource Help.Settings.Domains.IsDistPath}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding IsDistPath, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Domains.IsDistPath}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="140">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="AppFolder" ToolTip="{StaticResource Help.Settings.Domains.AppFolder}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding AppFolder, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Domains.AppFolder}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="140">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="TagFolder" ToolTip="{StaticResource Help.Settings.Domains.TagFolder}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding TagFolder, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Domains.TagFolder}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <WrapPanel Margin="0,0,0,6">
+                            <Button Command="{Binding Preferences.AddDomainCommand}"
+                                    ToolTip="{StaticResource Help.Settings.Domains.Add}"
+                                    Padding="12,5" Margin="0,0,6,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Add domain" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding Preferences.RemoveSelectedDomainsCommand}"
+                                    IsEnabled="{Binding Preferences.DomainsSelection.HasSelected}"
+                                    Padding="12,5" Margin="0,0,6,6"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Domains.RemoveSelected}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Remove selected" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Endpoint]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Endpoint" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Endpoint]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionHeader Title="Endpoint Scripts"
+                                                    HelpKey="Help.Settings.Endpoint"
+                                                    Margin="0,0,0,-12"/>
+                                <TextBlock Text="Folders the deployed install/detect scripts use on target machines. New bundles bake these paths in; existing bundles keep theirs."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="Tag folder" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.Endpoint.TagFolder}"/>
+                        <ui:TextBox Text="{Binding Preferences.EndpointTagFolder, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[EndpointTagFolder].IsEditable}"
+                                    PlaceholderText="C:\Wrapp\Tag"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock Text="Where deployed packages write detection results (DetectionResults.json) and install/uninstall transcript logs on the endpoint. Changing this only affects bundles created or re-scripted afterwards — existing deployed apps keep detecting against their original folder."
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <TextBlock Text="Local app folder" Style="{StaticResource FieldLabel}"
+                                   ToolTip="{StaticResource Help.Settings.Endpoint.LocalAppFolder}"/>
+                        <ui:TextBox Text="{Binding Preferences.EndpointLocalAppFolder, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[EndpointLocalAppFolder].IsEditable}"
+                                    PlaceholderText="C:\Wrapp\Apps"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock Text="Root folder for per-app local assets (e.g. shortcut icons) referenced by the install script samples."
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,4"/>
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Intune]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Intune" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Intune]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Intune Preferences" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Text="Saved tenants, package defaults, metadata templates, and assignment defaults used to seed new bundles."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Tenants -->
+                        <ctrl:SectionHeader Title="Tenants"
+                                            HelpKey="Help.Settings.Preferences.Tenants"/>
+                        <DataGrid ItemsSource="{Binding Preferences.IntuneTenants}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  Margin="0,0,0,6">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPolicyManaged}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="ToolTip" Value="Provisioned by your organization's policy - this entry cannot be modified or removed."/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Resources>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="" Width="28" IsReadOnly="True" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          Visibility="{Binding IsPolicyManaged, Converter={StaticResource InverseBoolToVis}}"/>
+                                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           ToolTip="Provisioned by your organization's policy - this entry cannot be modified or removed."
+                                                           ToolTipService.ShowOnDisabled="True"
+                                                           Visibility="{Binding IsPolicyManaged, Converter={StaticResource BoolToVis}}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="140">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Key" ToolTip="{StaticResource Help.Settings.Tenants.Key}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Tenants.Key}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="160">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Name" ToolTip="{StaticResource Help.Settings.Tenants.Name}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Tenants.Name}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="160">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Comment" ToolTip="{StaticResource Help.Settings.Tenants.Comment}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Tenants.Comment}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="200">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Client ID" ToolTip="{StaticResource Help.Settings.Tenants.ClientId}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding ClientID, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Tenants.ClientId}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Auth Flow" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox SelectedItem="{Binding AuthFlow, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                      ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidAuthFlows}"
+                                                      ToolTip="{StaticResource Help.Settings.Tenants.AuthFlow}"
+                                                      BorderThickness="0"
+                                                      Background="{DynamicResource DetectionDropdownBgBrush}"
+                                                      Padding="4,0" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- Client Secret: PasswordBox hides input on type.
+                                     When HasStoredSecret is true (DPAPI cipher is
+                                     already on the entry), a "Stored" placeholder
+                                     is shown; typing replaces it with a fresh value
+                                     that SettingsService.SavePreferencesAsync will
+                                     DPAPI-encrypt on Save. We never round-trip the
+                                     stored plaintext back into the UI. -->
+                                <DataGridTemplateColumn Header="Client Secret" Width="160">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid Visibility="{Binding FieldStates[ClientSecret].Visibility}"
+                                                  ToolTip="{Binding FieldStates[ClientSecret].DisabledReason, TargetNullValue={StaticResource Help.Settings.Tenants.ClientSecret}}">
+                                                <TextBlock Text="•••••••• (stored)"
+                                                           VerticalAlignment="Center"
+                                                           Margin="4,0"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding HasStoredSecret}" Value="True"/>
+                                                                        <Condition Binding="{Binding ClientSecret}" Value=""/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <PasswordBox x:Name="ClientSecretEditor"
+                                                             PasswordChanged="ClientSecretEditor_PasswordChanged"
+                                                             BorderThickness="0"
+                                                             Background="Transparent"
+                                                             VerticalAlignment="Center"
+                                                             Padding="2,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Cert Thumbprint" Width="180">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding CertThumbprint, UpdateSourceTrigger=LostFocus}"
+                                                     Visibility="{Binding FieldStates[CertThumbprint].Visibility}"
+                                                     ToolTip="{Binding FieldStates[CertThumbprint].DisabledReason, TargetNullValue={StaticResource Help.Settings.Tenants.CertThumbprint}}"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     VerticalAlignment="Center"
+                                                     Padding="2,0"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="Client secrets are DPAPI-encrypted on save — readable only by your Windows user on this machine."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,0,0,14">
+                            <Button Command="{Binding Preferences.AddIntuneTenantCommand}"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Tenants.Add}"
+                                    Padding="12,5" Margin="0,0,6,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Add tenant" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- Bundle -> catalogue pull. Explicit and non-destructive:
+                                 adds missing keys, fills blanks, overwrites nothing. -->
+                            <Button Command="{Binding PullTenantsFromBundleCommand}"
+                                    Padding="12,5" Margin="0,0,6,6"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Tenants.PullFromBundle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Pull from bundle" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding Preferences.RemoveSelectedIntuneTenantsCommand}"
+                                    IsEnabled="{Binding Preferences.IntuneTenantsSelection.HasSelected}"
+                                    Padding="12,5" Margin="0,0,6,6"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Tenants.RemoveSelected}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Remove selected" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- Package defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Package defaults"
+                                            HelpKey="Help.Settings.Preferences.IntunePackage"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[IntunePackageDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[IntunePackageDefaults].LockVisibility}"/></StackPanel>
+                        <Grid IsEnabled="{Binding Policy[IntunePackageDefaults].IsEditable}" ToolTip="{Binding Policy[IntunePackageDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Architecture" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.Requirements.Architecture}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidArchitecture}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.Architecture}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Install Experience" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.DeploymentBehavior.InstallExperience}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidInstallExperience}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.InstallExperience}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Max Install Time (min)" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.DeploymentBehavior.MaxInstallTime}"/>
+                                <ui:TextBox Text="{Binding Preferences.IntunePackage.MaximumInstallationTimeInMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="AzCopy Window Style" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.DeploymentBehavior.AzCopyWindowStyle}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidAzCopyWindowStyle}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.AzCopyWindowStyle}"
+                                          Margin="0,0,0,8"/>
+                                <CheckBox Content="Allow Available Uninstall"
+                                          IsChecked="{Binding Preferences.IntunePackage.AllowAvailableUninstall}"
+                                          ToolTip="{StaticResource Help.Intune.DeploymentBehavior.AllowAvailableUninstall}"
+                                          Margin="0,4,0,4"/>
+                                <CheckBox Content="Company Portal Featured App"
+                                          IsChecked="{Binding Preferences.IntunePackage.CompanyPortalFeaturedApp}"
+                                          ToolTip="{StaticResource Help.Intune.DeploymentBehavior.CompanyPortalFeaturedApp}"
+                                          Margin="0,0,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Min OS" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.Requirements.MinOS}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidMinOS}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.MinimumSupportedWindowsRelease}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Restart Behavior" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.DeploymentBehavior.RestartBehavior}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidRestartBehavior}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.RestartBehavior}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Update Mode" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.Intune.Installation.UpdateMode}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidUpdateModes}"
+                                          SelectedItem="{Binding Preferences.IntunePackage.UpdateMode}"
+                                          Margin="0,0,0,8"/>
+                                <CheckBox Content="Use AzCopy for upload"
+                                          IsChecked="{Binding Preferences.IntunePackage.UseAzCopy}"
+                                          ToolTip="{StaticResource Help.Intune.DeploymentBehavior.UseAzCopy}"
+                                          Margin="0,26,0,4"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Metadata defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Metadata defaults"
+                                            HelpKey="Help.Settings.Preferences.IntuneMetadata"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[IntuneMetadataDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[IntuneMetadataDefaults].LockVisibility}"/></StackPanel>
+                        <StackPanel IsEnabled="{Binding Policy[IntuneMetadataDefaults].IsEditable}" ToolTip="{Binding Policy[IntuneMetadataDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <TextBlock Text="App Name" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.ApplicationInfo.AppName}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.AppNameTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="Leave empty to use App.Name"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Developer" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.ApplicationInfo.Developer}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.DeveloperTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Owner" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.Metadata.Owner}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.OwnerTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Description" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.ApplicationInfo.Comment}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.CommentTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Notes" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.Metadata.Notes}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.NotesTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="Admin-only note merged into the Intune Notes field"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Information URL" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.Metadata.InformationURL}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.InformationURL, UpdateSourceTrigger=PropertyChanged}"
+                                        Margin="0,0,0,8"/>
+                            <TextBlock Text="Privacy URL" Style="{StaticResource FieldLabel}"
+                                       ToolTip="{StaticResource Help.Intune.Metadata.PrivacyURL}"/>
+                            <ui:TextBox Text="{Binding Preferences.IntuneMetadata.PrivacyURL, UpdateSourceTrigger=PropertyChanged}"
+                                        Margin="0,0,0,4"/>
+                            <TextBlock Text="Tokens: {{Company}} {{Name}} {{Version}} {{DotVersion}} {{Language}} {{Date}} {{Author}} {{EXEFile}} {{MSIFile}} {{GUID}} {{TagFolder}} {{LocalAppFolder}}"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- Assignment defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Assignment defaults"
+                                            HelpKey="Help.Settings.Preferences.IntuneAssignment"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[IntuneAssignmentDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[IntuneAssignmentDefaults].LockVisibility}"/></StackPanel>
+                        <Grid IsEnabled="{Binding Policy[IntuneAssignmentDefaults].IsEditable}" ToolTip="{Binding Policy[IntuneAssignmentDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" DataContext="{Binding Preferences.IntuneAssignment}">
+                                <ctrl:FieldLabelRow Text="Intent"
+                                                    Help="{StaticResource Help.Intune.Assignments.Intent}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidAssignmentIntents}"
+                                          SelectedItem="{Binding Intent}"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Group Mode"
+                                                    Help="{StaticResource Help.Intune.Assignments.GroupMode}"
+                                                    IsFieldEnabled="{Binding FieldStates[GroupMode].IsEnabled}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidGroupModes}"
+                                          SelectedItem="{Binding GroupMode}"
+                                          IsEnabled="{Binding FieldStates[GroupMode].IsEnabled}"
+                                          ToolTip="{Binding FieldStates[GroupMode].DisabledReason}"
+                                          ToolTipService.ShowOnDisabled="True"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Delivery Optimization"
+                                                    Help="{StaticResource Help.Intune.Assignments.DeliveryOptimization}"
+                                                    IsFieldEnabled="{Binding FieldStates[DeliveryOptimizationPriority].IsEnabled}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidDeliveryOptimizationPriorities}"
+                                          SelectedItem="{Binding DeliveryOptimizationPriority}"
+                                          IsEnabled="{Binding FieldStates[DeliveryOptimizationPriority].IsEnabled}"
+                                          ToolTip="{Binding FieldStates[DeliveryOptimizationPriority].DisabledReason}"
+                                          ToolTipService.ShowOnDisabled="True"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Available Time"
+                                                    Help="{StaticResource Help.Intune.Assignments.AvailableTime}"
+                                                    IsFieldEnabled="{Binding FieldStates[AvailableTime].IsEnabled}"/>
+                                <ctrl:DateTimePickerField
+                                    Text="{Binding AvailableTime, UpdateSourceTrigger=PropertyChanged}"
+                                    AsapValue="0001-01-01T00:00:00.000Z"
+                                    IsEnabled="{Binding FieldStates[AvailableTime].IsEnabled}"
+                                    ToolTip="{Binding FieldStates[AvailableTime].DisabledReason}"
+                                    ToolTipService.ShowOnDisabled="True"
+                                    Margin="0,0,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" DataContext="{Binding Preferences.IntuneAssignment}">
+                                <ctrl:FieldLabelRow Text="Type"
+                                                    Help="{StaticResource Help.Intune.Assignments.Type}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidAssignmentTypes}"
+                                          SelectedItem="{Binding Type}"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Notification"
+                                                    Help="{StaticResource Help.Intune.Assignments.Notification}"
+                                                    IsFieldEnabled="{Binding FieldStates[Notification].IsEnabled}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidIntuneNotifications}"
+                                          SelectedItem="{Binding Notification}"
+                                          IsEnabled="{Binding FieldStates[Notification].IsEnabled}"
+                                          ToolTip="{Binding FieldStates[Notification].DisabledReason}"
+                                          ToolTipService.ShowOnDisabled="True"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Filter Mode"
+                                                    Help="{StaticResource Help.Intune.Assignments.FilterMode}"
+                                                    IsFieldEnabled="{Binding FieldStates[FilterMode].IsEnabled}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidFilterModes}"
+                                          SelectedItem="{Binding FilterMode}"
+                                          IsEditable="True"
+                                          IsEnabled="{Binding FieldStates[FilterMode].IsEnabled}"
+                                          ToolTip="{Binding FieldStates[FilterMode].DisabledReason}"
+                                          ToolTipService.ShowOnDisabled="True"
+                                          Margin="0,0,0,8"/>
+                                <ctrl:FieldLabelRow Text="Deadline Time"
+                                                    Help="{StaticResource Help.Intune.Assignments.DeadlineTime}"
+                                                    IsFieldEnabled="{Binding FieldStates[DeadlineTime].IsEnabled}"/>
+                                <ctrl:DateTimePickerField
+                                    Text="{Binding DeadlineTime, UpdateSourceTrigger=PropertyChanged}"
+                                    AsapValue="0001-01-01T00:00:00.000Z"
+                                    IsEnabled="{Binding FieldStates[DeadlineTime].IsEnabled}"
+                                    ToolTip="{Binding FieldStates[DeadlineTime].DisabledReason}"
+                                    ToolTipService.ShowOnDisabled="True"
+                                    Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Restart grace period defaults (applied only when EnableRestartGracePeriod is checked) -->
+                        <StackPanel Margin="0,0,0,8" DataContext="{Binding Preferences.IntuneAssignment}">
+                            <CheckBox Content="Apply restart grace period defaults to new assignments"
+                                      IsChecked="{Binding EnableRestartGracePeriod}"
+                                      IsEnabled="{Binding FieldStates[EnableRestartGracePeriod].IsEnabled}"
+                                      ToolTip="{Binding FieldStates[EnableRestartGracePeriod].DisabledReason, TargetNullValue={StaticResource Help.Intune.Assignments.EnableRestartGrace}}"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      Margin="0,0,0,4"/>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ctrl:FieldLabelRow Text="Restart Grace Period (min)"
+                                                        IsFieldEnabled="{Binding FieldStates[RestartGracePeriodInMinutes].IsEnabled}"
+                                                        Help="{StaticResource Help.Settings.Preferences.IntuneAssignment.RestartGracePeriod}"/>
+                                    <ui:TextBox Text="{Binding RestartGracePeriodInMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding FieldStates[RestartGracePeriodInMinutes].IsEnabled}"
+                                                ToolTip="{Binding FieldStates[RestartGracePeriodInMinutes].DisabledReason, TargetNullValue={StaticResource Help.Settings.Preferences.IntuneAssignment.RestartGracePeriod}}"
+                                                ToolTipService.ShowOnDisabled="True"
+                                                PlaceholderText="1440"
+                                                Margin="0,0,0,4"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <ctrl:FieldLabelRow Text="Restart Countdown Display (min)"
+                                                        IsFieldEnabled="{Binding FieldStates[RestartCountDownDisplayInMinutes].IsEnabled}"
+                                                        Help="{StaticResource Help.Settings.Preferences.IntuneAssignment.RestartCountDownDisplay}"/>
+                                    <ui:TextBox Text="{Binding RestartCountDownDisplayInMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding FieldStates[RestartCountDownDisplayInMinutes].IsEnabled}"
+                                                ToolTip="{Binding FieldStates[RestartCountDownDisplayInMinutes].DisabledReason, TargetNullValue={StaticResource Help.Settings.Preferences.IntuneAssignment.RestartCountDownDisplay}}"
+                                                ToolTipService.ShowOnDisabled="True"
+                                                PlaceholderText="15"
+                                                Margin="0,0,0,4"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <ctrl:FieldLabelRow Text="Restart Notification Snooze (min)"
+                                                        IsFieldEnabled="{Binding FieldStates[RestartNotificationSnoozeInMinutes].IsEnabled}"
+                                                        Help="{StaticResource Help.Settings.Preferences.IntuneAssignment.RestartNotificationSnooze}"/>
+                                    <ui:TextBox Text="{Binding RestartNotificationSnoozeInMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding FieldStates[RestartNotificationSnoozeInMinutes].IsEnabled}"
+                                                ToolTip="{Binding FieldStates[RestartNotificationSnoozeInMinutes].DisabledReason, TargetNullValue={StaticResource Help.Settings.Preferences.IntuneAssignment.RestartNotificationSnooze}}"
+                                                ToolTipService.ShowOnDisabled="True"
+                                                PlaceholderText="240"
+                                                Margin="0,0,0,4"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[SCCM]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Server24" FontSize="14"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="SCCM" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[SCCM]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE968;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="SCCM Preferences" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Text="Saved sites, package defaults, metadata templates, and deployment defaults used to seed new bundles."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Sites -->
+                        <ctrl:SectionHeader Title="Sites"
+                                            HelpKey="Help.Settings.Preferences.Sites"/>
+                        <DataGrid ItemsSource="{Binding Preferences.SCCMSites}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  Margin="0,0,0,6">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPolicyManaged}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="ToolTip" Value="Provisioned by your organization's policy - this entry cannot be modified or removed."/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Resources>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="" Width="28" IsReadOnly="True" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          Visibility="{Binding IsPolicyManaged, Converter={StaticResource InverseBoolToVis}}"/>
+                                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           ToolTip="Provisioned by your organization's policy - this entry cannot be modified or removed."
+                                                           ToolTipService.ShowOnDisabled="True"
+                                                           Visibility="{Binding IsPolicyManaged, Converter={StaticResource BoolToVis}}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="100">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Key" ToolTip="{StaticResource Help.Settings.Sites.Key}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Sites.Key}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="220">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Comment" ToolTip="{StaticResource Help.Settings.Sites.Comment}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Sites.Comment}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="260">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="App Folder" ToolTip="{StaticResource Help.Settings.Sites.AppFolder}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding AppFolder, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Sites.AppFolder}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="200">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Icon Folder" ToolTip="{StaticResource Help.Settings.Sites.IconFolder}"/>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding IconFolder, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{StaticResource Help.Settings.Sites.IconFolder}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="Deployment groups round-trip from settings.json but are edited per-bundle in the SCCM view."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,0,0,14">
+                            <Button Command="{Binding Preferences.AddSccmSiteCommand}"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Sites.Add}"
+                                    Padding="12,5" Margin="0,0,6,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Add site" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- See the Tenants tab for the pull semantics. -->
+                            <Button Command="{Binding PullSitesFromBundleCommand}"
+                                    Padding="12,5" Margin="0,0,6,6"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Sites.PullFromBundle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Pull from bundle" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding Preferences.RemoveSelectedSccmSitesCommand}"
+                                    IsEnabled="{Binding Preferences.SccmSitesSelection.HasSelected}"
+                                    Padding="12,5" Margin="0,0,6,6"
+                                    ToolTip="{StaticResource Help.Settings.Preferences.Sites.RemoveSelected}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Remove selected" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- Package defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Package defaults"
+                                            HelpKey="Help.Settings.Preferences.SccmPackage"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[SccmPackageDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[SccmPackageDefaults].LockVisibility}"/></StackPanel>
+                        <Grid IsEnabled="{Binding Policy[SccmPackageDefaults].IsEditable}" ToolTip="{Binding Policy[SccmPackageDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Installation Behavior" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.InstallBehavior}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidInstallationBehaviorTypes}"
+                                          SelectedItem="{Binding Preferences.SccmPackage.InstallationBehaviorType}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="User Interaction" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.UserInteractionMode}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidUserInteractionModes}"
+                                          SelectedItem="{Binding Preferences.SccmPackage.UserInteractionMode}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Slow Network Mode" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.SlowNetwork}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidSlowNetworkDeploymentModes}"
+                                          SelectedItem="{Binding Preferences.SccmPackage.SlowNetworkDeploymentMode}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Estimated Runtime (min)" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.EstimatedRuntime}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmPackage.EstimatedRuntimeMins, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <CheckBox Content="Install Behavior"
+                                          IsChecked="{Binding Preferences.SccmPackage.InstallBehavior}"
+                                          ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.Force32Bit}"
+                                          Margin="0,4,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <ctrl:FieldLabelRow Text="Logon Requirement"
+                                                    Help="{StaticResource Help.SCCM.DeploymentTypeSettings.LogonRequirement}"
+                                                    IsFieldEnabled="{Binding Preferences.SccmPackage.FieldStates[LogonRequirementType].IsEnabled}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidLogonRequirementTypes}"
+                                          SelectedItem="{Binding Preferences.SccmPackage.LogonRequirementType}"
+                                          IsEnabled="{Binding Preferences.SccmPackage.FieldStates[LogonRequirementType].IsEnabled}"
+                                          ToolTip="{Binding Preferences.SccmPackage.FieldStates[LogonRequirementType].DisabledReason, TargetNullValue={StaticResource Help.SCCM.DeploymentTypeSettings.LogonRequirement}}"
+                                          ToolTipService.ShowOnDisabled="True"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Reboot Behavior" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.RebootBehaviorTooltip}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidRebootBehaviors}"
+                                          SelectedItem="{Binding Preferences.SccmPackage.RebootBehavior}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Max Allowed Runtime (min)" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.MaxRuntime}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmPackage.MaximumAllowedRuntimeMins, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <CheckBox Content="Content Fallback"
+                                          IsChecked="{Binding Preferences.SccmPackage.ContentFallback}"
+                                          ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.ContentFallback}"
+                                          Margin="0,26,0,4"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Metadata defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Metadata defaults"
+                                            HelpKey="Help.Settings.Preferences.SccmMetadata"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[SccmMetadataDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[SccmMetadataDefaults].LockVisibility}"/></StackPanel>
+                        <Grid IsEnabled="{Binding Policy[SccmMetadataDefaults].IsEditable}" ToolTip="{Binding Policy[SccmMetadataDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Publisher" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Publisher}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.PublisherTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Support Contact" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.SupportContact}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.SupportContactTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Comment" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AppComment}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.CommentTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Description" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Description}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.DescriptionTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Localized Name" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedName}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.LocalizedNameTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Keywords" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Keywords}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.KeywordsTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="User Documentation" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.UserDocumentation}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.UserDocumentation, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Release Date" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.ReleaseDate}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.ReleaseDateTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,4"/>
+                                <CheckBox Content="Is Featured"
+                                          IsChecked="{Binding Preferences.SccmMetadata.IsFeatured}"
+                                          ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Featured}"
+                                          Margin="0,4,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Owner" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Owner}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.OwnerTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Name" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AppName}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.NameTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Localized Description" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedDescription}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.LocalizedDescriptionTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Privacy URL" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.PrivacyUrl}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.PrivacyUrl, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <TextBlock Text="Link Text" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LinkText}"/>
+                                <ui:TextBox Text="{Binding Preferences.SccmMetadata.LinkText, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,0,0,8"/>
+                                <CheckBox Content="Auto Install"
+                                          IsChecked="{Binding Preferences.SccmMetadata.AutoInstall}"
+                                          ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AutoInstall}"
+                                          Margin="0,22,0,4"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="Tokens: {{Company}} {{Name}} {{Version}} {{DotVersion}} {{Language}} {{Date}} {{Author}} {{EXEFile}} {{MSIFile}} {{GUID}} {{TagFolder}} {{LocalAppFolder}}"
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,-8,0,14"/>
+
+                        <!-- Deployment defaults -->
+                        <StackPanel Orientation="Horizontal"><ctrl:SectionHeader Title="Deployment defaults"
+                                            HelpKey="Help.Settings.Preferences.SccmDeployment"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="{Binding Policy[SccmDeploymentDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Visibility="{Binding Policy[SccmDeploymentDefaults].LockVisibility}"/></StackPanel>
+                        <Grid IsEnabled="{Binding Policy[SccmDeploymentDefaults].IsEditable}" ToolTip="{Binding Policy[SccmDeploymentDefaults].Reason}" ToolTipService.ShowOnDisabled="True" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Deploy Action" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.DeployAction}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidDeployActions}"
+                                          SelectedItem="{Binding Preferences.SccmDeployment.DeployAction}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="User Notification" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.UserNotification}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidUserNotifications}"
+                                          SelectedItem="{Binding Preferences.SccmDeployment.UserNotification}"
+                                          Margin="0,0,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Deploy Purpose" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.DeployPurpose}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidDeployPurposes}"
+                                          SelectedItem="{Binding Preferences.SccmDeployment.DeployPurpose}"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Text="Time Base On" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.TimeBaseOn}"/>
+                                <ComboBox ItemsSource="{x:Static svc:ModuleDefaultsSeed.ValidTimeBaseOn}"
+                                          SelectedItem="{Binding Preferences.SccmDeployment.TimeBaseOn}"
+                                          Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Available Date/Time" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.AvailableDateTime}"/>
+                                <!-- AsapValue intentionally omitted: 0001-01-01 is the Intune
+                                     ASAP sentinel and SCCM's New-CMApplicationDeployment underflows
+                                     on .ToUniversalTime() for negative TZs. ASAP here writes current
+                                     UTC time, which SCCM accepts and means "available immediately." -->
+                                <ctrl:DateTimePickerField
+                                    Text="{Binding Preferences.SccmDeployment.AvailableDateTime, UpdateSourceTrigger=PropertyChanged}"
+                                    Margin="0,0,0,4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Deadline Date/Time" Style="{StaticResource FieldLabel}"
+                                           ToolTip="{StaticResource Help.SCCM.Deployments.DeadlineDateTime}"/>
+                                <ctrl:DateTimePickerField
+                                    Text="{Binding Preferences.SccmDeployment.DeadlineDateTime, UpdateSourceTrigger=PropertyChanged}"
+                                    Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[KeyVault]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Key Vault" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[KeyVault]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionHeader Title="Key Vault"
+                                                    HelpKey="Help.Settings.KeyVault"
+                                                    Margin="0,0,0,-12"/>
+                                <TextBlock Text="Azure DevOps repo for storing encryption keys used during app cloning"
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+
+                    <StackPanel>
+                        <TextBlock Text="When Wrapp uploads an app to Intune, the encryption keys from the .intunewin package are saved to this repo. These keys enable Full Clone to decrypt and extract the original installer content."
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <CheckBox Content="Use Azure DevOps key vault"
+                                  IsChecked="{Binding EnableAzureDevOpsKeyVault, Mode=TwoWay}" IsEnabled="{Binding Policy[EnableAzureDevOpsKeyVault].IsEditable}"
+                                  ToolTip="{StaticResource Help.Settings.KeyVault.Enable}"
+                                  Margin="0,0,0,8"/>
+
+                        <TextBlock Text="Azure DevOps Repo URL" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding KeyVaultRepoUrl, UpdateSourceTrigger=PropertyChanged}"
+                                    IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                    ToolTip="{StaticResource Help.Settings.KeyVault.RepoUrl}"
+                                    PlaceholderText="https://dev.azure.com/org/project/_git/repo"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock Text="The repo must exist and you must have Contributor access. Connect to Azure DevOps via the account menu in the title bar."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <!-- Phase 16c: tokenized key-path templates -->
+                        <TextBlock Text="Auto-Capture Key Path Template" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding KeyVaultPathTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                    IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                    ToolTip="{StaticResource Help.Settings.KeyVault.PathTemplate}"
+                                    PlaceholderText="/wrapp/{Tenant}/{AppId}.json"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,2"
+                                   Text="Tokens: {Tenant} {AppId} {AppName} {PackageName} {Date} {Author}. Forward slashes in the template create folders; values containing slashes collapse to a single segment."/>
+                        <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Preview: " FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding KeyVaultPathPreview}"
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#4ec9b0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Manual Key Path Template" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding KeyVaultManualPathTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                    IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                    ToolTip="{StaticResource Help.Settings.KeyVault.ManualPathTemplate}"
+                                    PlaceholderText="/manual/{PackageName}.json"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,2"
+                                   Text="Used when keys are saved manually from Tools > Inspect (no Tenant / AppId available; those tokens expand to empty)."/>
+                        <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Preview: " FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding KeyVaultManualPathPreview}"
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#4ec9b0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Phase 16d: PR-mode toggle + revealed-on-check panel -->
+                        <CheckBox Content="Open Pull Requests instead of committing directly to main"
+                                  IsChecked="{Binding KeyVaultUsePullRequests, Mode=TwoWay}"
+                                  IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                  ToolTip="{StaticResource Help.Settings.KeyVault.UsePullRequests}"
+                                  Margin="0,0,0,4"/>
+                        <StackPanel Visibility="{Binding KeyVaultUsePullRequests, Converter={StaticResource BoolToVis}}"
+                                    Margin="16,4,0,0">
+                            <TextBlock Text="PR Source Branch Template" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,4"/>
+                            <ui:TextBox Text="{Binding KeyVaultPrSourceBranchTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                        ToolTip="{StaticResource Help.Settings.KeyVault.PrSourceBranch}"
+                                        PlaceholderText="wrapp-keys/{Date}/{AppId}"
+                                        Margin="0,0,0,4"/>
+                            <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,2"
+                                       Text="Same tokens as the path templates. Forward slashes create nested branch namespaces."/>
+                            <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Preview: " FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding KeyVaultPrSourceBranchPreview}"
+                                               FontFamily="Consolas" FontSize="11"
+                                               Foreground="#4ec9b0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="PR Title Template" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding KeyVaultPrTitleTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                        ToolTip="{StaticResource Help.Settings.KeyVault.PrTitle}"
+                                        PlaceholderText="Wrapp: encryption keys for {AppName} ({AppId})"
+                                        Margin="0,0,0,4"/>
+                            <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Preview: " FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding KeyVaultPrTitlePreview}"
+                                               FontFamily="Consolas" FontSize="11"
+                                               Foreground="#4ec9b0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="PR Description Template" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding KeyVaultPrDescriptionTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                        IsEnabled="{Binding EnableAzureDevOpsKeyVault}"
+                                        ToolTip="{StaticResource Help.Settings.KeyVault.PrDescription}"
+                                        PlaceholderText="Automated push by Wrapp on {Date} by {Author}..."
+                                        AcceptsReturn="True" TextWrapping="Wrap"
+                                        Height="80" Margin="0,0,0,4"/>
+                            <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,4"
+                                       Text="Multi-line. Press Enter for real newlines; a literal \n is passed through to the PR body exactly as typed."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Updates]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Updates" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Updates]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+                <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionHeader Title="Updates"
+                                                    HelpKey="Help.Settings.Updates"
+                                                    Margin="0,0,0,-12"/>
+                                <TextBlock Text="{Binding CurrentAppVersion}"
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+
+                    <StackPanel>
+                        <TextBlock Text="Applies only to installed copies of Wrapp (Setup.exe / MSI). Portable and development builds ignore these settings."
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Update Feed" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding UpdateFeedUrl, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Policy[UpdateFeedUrl].IsEditable}"
+                                    ToolTip="{StaticResource Help.Settings.Updates.Feed}"
+                                    PlaceholderText="https://updates.example.com/wrapp  or  \\server\share\wrapp-updates"
+                                    Margin="0,0,0,4"/>
+                        <TextBlock Text="An https:// URL, UNC share, or local folder hosting the Wrapp release feed. Updates are executable code: the location requires a one-time approval on this machine when you Save, and plain http:// is not accepted."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Update Mode" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding UpdateModes}"
+                                  SelectedItem="{Binding UpdateMode, Mode=TwoWay}" IsEnabled="{Binding Policy[UpdateMode].IsEditable}"
+                                  ToolTip="{StaticResource Help.Settings.Updates.Mode}"
+                                  Width="220" HorizontalAlignment="Left" Margin="0,0,0,4"/>
+                        <TextBlock Text="Auto: updates are required — at launch you must update and restart, or close Wrapp. NotifyOnly: announce and let you decide (use when your organization pushes updates via Intune/SCCM). Disabled: never check."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <ui:Button Content="Check for updates"
+                                       Command="{Binding CheckForUpdatesCommand}"
+                                       ToolTip="{StaticResource Help.Settings.Updates.Check}"
+                                       Margin="0,0,12,0"/>
+                            <ui:Button Content="Install update"
+                                       Appearance="Primary"
+                                       Command="{Binding InstallUpdateCommand}"
+                                       Visibility="{Binding UpdateInstallVisible, Converter={StaticResource BoolToVis}}"
+                                       ToolTip="{StaticResource Help.Settings.Updates.Install}"
+                                       Margin="0,0,12,0"/>
+                            <TextBlock Text="{Binding UpdateCheckStatus}"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock Text="Checks the saved feed — save changes first."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap"/>
+
+                    </StackPanel>
+                </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- =========================================================
+                 PLACEHOLDERS (Workstream P)
+                 One live table of built-in + custom {{Name}} placeholders.
+                 The effective-configuration viewers and log-redaction
+                 summary live in the Provisioning tab below.
+                 ========================================================= -->
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Placeholders]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8AC;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Placeholders" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Placeholders]}"/>
+                        <!-- Mini error badge: same count as the Settings nav badge -->
+                        <Border Background="{DynamicResource BadgeBgBrush}" CornerRadius="6"
+                                MinWidth="12" Height="12" Padding="3,0"
+                                VerticalAlignment="Center" Margin="6,0,0,0"
+                                ToolTip="{StaticResource Help.Common.ErrorBadge}"
+                                Visibility="{Binding Placeholders.ErrorCount, Converter={StaticResource IntToVis}}">
+                            <TextBlock Text="{Binding Placeholders.ErrorCount}" FontSize="8" FontWeight="Bold"
+                                       Foreground="{DynamicResource BadgeFgBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+
+                        <!-- The placeholder table -->
+                        <Expander IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                            <Expander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE8AC;" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="20" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,0,12,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ctrl:SectionHeader Title="Placeholders"
+                                                            HelpKey="Help.Settings.Placeholders"
+                                                            Margin="0,0,0,-12"/>
+                                        <TextBlock Text="{}{{Name}} tokens expanded into templates, metadata and scripts. Built-in rows show their live values for the current bundle."
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+                            <StackPanel Margin="0,8,0,0">
+                                <!-- Editable cells are always-on TextBoxes in template columns
+                                     (the Detection tests grid pattern) rather than
+                                     DataGridTextColumns: the app TextBox theme then applies to
+                                     the editor directly, so foreground/caret stay visible in
+                                     both themes, and built-in rows simply get no editor. -->
+                                <DataGrid ItemsSource="{Binding Placeholders.Rows}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False" CanUserDeleteRows="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                          Margin="0,0,0,6">
+                                    <DataGrid.Resources>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                                    </DataGrid.Resources>
+                                    <DataGrid.RowStyle>
+                                        <!-- Built-in rows are muted AND banded: read-only
+                                             reference values, visually locked. -->
+                                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                                                    <Setter Property="Background" Value="{DynamicResource RowAltBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="28" IsReadOnly="True" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="170">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="Name" ToolTip="{StaticResource Help.Settings.Placeholders.Name}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid>
+                                                        <!-- Built-in: informational lock (FieldLabelRow's
+                                                             glyph — NOT clickable, unlike Detection's
+                                                             path lock) + name. -->
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVis}}"
+                                                                    ToolTip="{StaticResource Help.Settings.Placeholders.BuiltInLock}">
+                                                            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                                       Margin="4,0,6,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding Name, Mode=OneWay}"
+                                                                       Padding="0,2,4,2" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <!-- Red border on rows in error: the Detection
+                                                             IsSymbolDuplicate cell-flagging pattern. -->
+                                                        <Border CornerRadius="2"
+                                                                Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsDuplicate}" Value="True">
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                     ToolTip="{StaticResource Help.Settings.Placeholders.Name}"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Kind" Binding="{Binding Kind, Mode=OneWay}" IsReadOnly="True" Width="70"/>
+                                        <!-- Value: live TextBlock for built-ins; TextBox for plain
+                                             customs; PasswordBox + "(stored)" affordance for
+                                             sensitive customs (the tenant Client Secret pattern —
+                                             stored plaintext never round-trips into the UI). -->
+                                        <DataGridTemplateColumn Header="Value" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid ToolTip="{StaticResource Help.Settings.Placeholders.Value}">
+                                                        <TextBlock Text="{Binding Value}"
+                                                                   Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVis}}"
+                                                                   VerticalAlignment="Center" Margin="4,0"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                 BorderThickness="0" Background="Transparent"
+                                                                 VerticalAlignment="Center" Padding="4,2">
+                                                            <TextBox.Style>
+                                                                <!-- BasedOn keeps the app's implicit TextBox theme
+                                                                     (foreground + caret brush); without it this
+                                                                     visibility style replaces the theme and the
+                                                                     caret falls back to black. -->
+                                                                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <MultiDataTrigger>
+                                                                            <MultiDataTrigger.Conditions>
+                                                                                <Condition Binding="{Binding IsCustom}" Value="True"/>
+                                                                                <Condition Binding="{Binding IsSensitive}" Value="False"/>
+                                                                            </MultiDataTrigger.Conditions>
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </MultiDataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBox.Style>
+                                                        </TextBox>
+                                                        <Grid>
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <MultiDataTrigger>
+                                                                            <MultiDataTrigger.Conditions>
+                                                                                <Condition Binding="{Binding IsCustom}" Value="True"/>
+                                                                                <Condition Binding="{Binding IsSensitive}" Value="True"/>
+                                                                            </MultiDataTrigger.Conditions>
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </MultiDataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <TextBlock Text="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022; (stored)"
+                                                                       VerticalAlignment="Center" Margin="4,0" FontSize="12"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <MultiDataTrigger>
+                                                                                <MultiDataTrigger.Conditions>
+                                                                                    <Condition Binding="{Binding HasStoredSecret}" Value="True"/>
+                                                                                    <Condition Binding="{Binding PendingSecretValue}" Value=""/>
+                                                                                </MultiDataTrigger.Conditions>
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </MultiDataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <PasswordBox PasswordChanged="PlaceholderSecretEditor_PasswordChanged"
+                                                                         BorderThickness="0" Background="Transparent"
+                                                                         VerticalAlignment="Center" Padding="2,0"/>
+                                                        </Grid>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Sensitive" Width="90" IsReadOnly="True" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSensitive, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}"
+                                                              ToolTip="{StaticResource Help.Settings.Placeholders.Sensitive}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="*">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="Comment" ToolTip="{StaticResource Help.Settings.Placeholders.Comment}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"
+                                                             ToolTip="{StaticResource Help.Settings.Placeholders.Comment}"
+                                                             Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Name validation errors (same style as the Detection
+                                     duplicate-symbol warning): flagged rows BLOCK the save. -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6"
+                                            Visibility="{Binding Placeholders.HasNameWarning, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               Foreground="{DynamicResource ErrorBrush}"
+                                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding Placeholders.NameWarning}"
+                                               FontSize="11" Foreground="{DynamicResource ErrorBrush}"
+                                               VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Sensitive values are DPAPI-encrypted into placeholders.secure.json on Save — readable only by your Windows user on this machine, never exported, and scrubbed from logs."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,0,0,6">
+                                    <Button Command="{Binding Placeholders.AddPlaceholderCommand}"
+                                            ToolTip="{StaticResource Help.Settings.Placeholders.Add}"
+                                            Padding="12,5" Margin="0,0,6,6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Add placeholder" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding Placeholders.RemoveSelectedPlaceholdersCommand}"
+                                            IsEnabled="{Binding Placeholders.RowsSelection.HasSelected}"
+                                            Padding="12,5" Margin="0,0,6,6"
+                                            ToolTip="{StaticResource Help.Settings.Placeholders.Remove}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Remove selected" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- =========================================================
+                 PROVISIONING (formerly "Defaults")
+                 Where this profile's configuration comes from and what is
+                 actually in effect: org-defaults import, full settings
+                 export/import, the effective-configuration viewers, and
+                 the log-redaction summary. Org-defaults import used to sit
+                 at the bottom of the Updates tab (unrelated, and
+                 undiscoverable there) and export/import were glyph-only
+                 buttons in the view header.
+                 ========================================================= -->
+            <TabItem Style="{StaticResource SettingsNavTab}" Visibility="{Binding PolicyTabs[Provisioning]}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="Provisioning" FontSize="13" VerticalAlignment="Center"/><TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" ToolTip="Some settings in this tab are managed by your organization's policy." Visibility="{Binding PolicyTabLocks[Provisioning]}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              helpers:SmoothScroll.Enabled="True">
+                    <StackPanel MaxWidth="800" Margin="20,16,20,16">
+
+                        <Expander Visibility="{Binding OrgDefaultsImportCardVisibility}" IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                            <Expander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ctrl:SectionHeader Title="Organization defaults"
+                                                            HelpKey="Help.Settings.Defaults.OrgImport"
+                                                            Margin="0,0,0,-12"/>
+                                        <TextBlock Text="Pre-fill this profile from a file supplied by your IT team"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="Import a defaults file (.json) to pre-fill tenants, SCCM sites, domains, Key Vault, update feed and packaging defaults. Only settings still at their factory values are changed — your own choices are never overwritten. The file is stored where it survives app updates."
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <ui:Button Content="Import organization defaults..."
+                                           Command="{Binding ImportOrgDefaultsCommand}"
+                                           ToolTip="{StaticResource Help.Settings.Defaults.OrgImport.Button}"
+                                           Cursor="Hand"
+                                           HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander Visibility="{Binding SettingsImportCardVisibility}" IsExpanded="True" Style="{StaticResource SettingsCardExpander}">
+                            <Expander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xEDE1;" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ctrl:SectionHeader Title="Export / import settings"
+                                                            HelpKey="Help.Settings.Defaults.Portability"
+                                                            Margin="0,0,0,-12"/>
+                                        <TextBlock Text="Move a configured profile between machines, or share a baseline"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="Export writes your whole profile — paths, tenants, sites, domains, Key Vault, update settings and all packaging defaults — to a JSON file. Client secrets and this machine's trust approvals are deliberately left out: they cannot be used on another machine. An exported file also works as an organization defaults file."
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <ui:Button Content="Export settings..."
+                                               Command="{Binding ExportSettingsCommand}"
+                                               ToolTip="{StaticResource Help.Settings.Defaults.Portability.Export}"
+                                               Cursor="Hand"
+                                               Margin="0,0,10,0"/>
+                                    <ui:Button Content="Import settings..."
+                                               ToolTip="{StaticResource Help.Settings.Defaults.Portability.Import}"
+                                               Cursor="Hand"
+                                               Command="{Binding ImportSettingsCommand}"/>
+                                </StackPanel>
+                                <TextBlock Text="Importing replaces your current configuration. Your secrets, Key Vault and update-feed approvals, and your acceptance of the liability waiver are kept as they are on this machine."
+                                           FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Effective configuration (read-only viewers) -->
+                        <Expander IsExpanded="False" Style="{StaticResource SettingsCardExpander}">
+                            <Expander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE7C3;" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ctrl:SectionHeader Title="Effective configuration"
+                                                            HelpKey="Help.Settings.EffectiveConfig"
+                                                            Margin="0,0,0,-12"/>
+                                        <TextBlock Text="What is actually in effect: organization policy, your preferences, and the organization defaults file"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+                            <StackPanel Margin="0,8,0,0">
+
+                                <!-- Enterprise policy transparency (Wrapp's chrome://policy):
+                                     every mandated value with its source hive. -->
+                                <StackPanel Margin="0,0,0,12"
+                                            Visibility="{Binding AnyPolicyManaged, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="Organization policy (Software\Policies\Wrapp)"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,0,0,6"/>
+                                    <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                            Background="{DynamicResource InputBgBrush}" CornerRadius="4"
+                                            Padding="10,6">
+                                        <ItemsControl ItemsSource="{Binding ManagedPolicyRows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1,0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="280"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Key}" FontFamily="Consolas" FontSize="11"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" FontFamily="Consolas" FontSize="11"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" Margin="8,0"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Source}" FontSize="10"
+                                                                   Foreground="{DynamicResource TextMutedBrush}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                    <TextBlock Text="Mandated values are enforced at launch, on every save, and after any settings import. Change them via Group Policy / Intune / Apply-WrappPolicy.ps1, then restart Wrapp."
+                                               FontSize="11" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,6,0,0"/>
+                                </StackPanel>
+
+                                <!-- Hand on the expander header; Arrow re-asserted on the
+                                     content root so it doesn't inherit down (the TabItem
+                                     cursor-leak lesson). -->
+                                <Expander IsExpanded="False" Margin="0,0,0,10" Cursor="Hand">
+                                    <Expander.Header>
+                                        <TextBlock Text="Active preferences (settings.json, secrets stripped)"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Expander.Header>
+                                    <StackPanel Margin="0,6,0,0" Cursor="Arrow">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <Button Command="{Binding Placeholders.RefreshPreferencesJsonCommand}"
+                                                    ToolTip="{StaticResource Help.Settings.EffectiveConfig.Refresh}"
+                                                    Cursor="Hand"
+                                                    Padding="10,4" Margin="0,0,8,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Refresh" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <!-- Where this JSON is read from, with the standard
+                                                 open/copy path actions. -->
+                                            <ctrl:PathActionsRow Path="{Binding SettingsPath}"
+                                                                 MaxWidth="440" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                                Background="{DynamicResource InputBgBrush}" CornerRadius="4">
+                                            <ScrollViewer Height="280"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          HorizontalScrollBarVisibility="Auto"
+                                                          helpers:SmoothScroll.Enabled="True">
+                                                <!-- Wheel handling: the wrapper viewer's SmoothScroll
+                                                     scrolls this (its inner-first guard lets nested
+                                                     viewers win; the page viewer stands aside). -->
+                                                <TextBox Text="{Binding Placeholders.PreferencesJson, Mode=OneWay}"
+                                                         IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                         FontFamily="Consolas" FontSize="11"
+                                                         BorderThickness="0" Background="Transparent"
+                                                         VerticalScrollBarVisibility="Disabled"
+                                                         HorizontalScrollBarVisibility="Disabled"
+                                                         TextWrapping="NoWrap" AcceptsReturn="True"
+                                                         Padding="8,6"/>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander IsExpanded="False" Cursor="Hand">
+                                    <Expander.Header>
+                                        <TextBlock Text="Active organization defaults"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Expander.Header>
+                                    <StackPanel Margin="0,6,0,0" Cursor="Arrow">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <Button Command="{Binding Placeholders.RefreshOrgDefaultsCommand}"
+                                                    ToolTip="{StaticResource Help.Settings.EffectiveConfig.Refresh}"
+                                                    Cursor="Hand"
+                                                    Padding="10,4" Margin="0,0,8,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Refresh" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <!-- Where the org defaults are read from, with the
+                                                 standard open/copy path actions (buttons disable
+                                                 when no file was found). -->
+                                            <ctrl:PathActionsRow Path="{Binding Placeholders.OrgDefaultsPath}"
+                                                                 MaxWidth="440" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                                Background="{DynamicResource InputBgBrush}" CornerRadius="4">
+                                            <ScrollViewer Height="280"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          HorizontalScrollBarVisibility="Auto"
+                                                          helpers:SmoothScroll.Enabled="True">
+                                                <TextBox Text="{Binding Placeholders.OrgDefaultsContent, Mode=OneWay}"
+                                                         IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                         FontFamily="Consolas" FontSize="11"
+                                                         BorderThickness="0" Background="Transparent"
+                                                         VerticalScrollBarVisibility="Disabled"
+                                                         HorizontalScrollBarVisibility="Disabled"
+                                                         TextWrapping="NoWrap" AcceptsReturn="True"
+                                                         Padding="8,6"/>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Log redaction (read-only) -->
+                        <Expander IsExpanded="False" Style="{StaticResource SettingsCardExpander}">
+                            <Expander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="18" VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ctrl:SectionHeader Title="Log redaction"
+                                                            HelpKey="Help.Settings.Redaction"
+                                                            Margin="0,0,0,-12"/>
+                                        <TextBlock Text="What is scrubbed from every log line before it reaches disk or the Logs view"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock Text="Built-in scrubbers (always on)" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding Placeholders.RedactionBuiltIns}" Margin="0,0,0,10">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="11"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       Margin="8,1,0,1"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="Organization patterns (&#x2192; ***ORG-REDACTED***)" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <ItemsControl ItemsSource="{Binding Placeholders.RedactionOrgPatterns}"
+                                              Visibility="{Binding Placeholders.HasOrgPatterns, Converter={StaticResource BoolToVis}}"
+                                              Margin="0,0,0,4">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="11"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       Margin="8,1,0,1" TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Placeholders.RedactionOrgSource}"
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="Sensitive placeholder values" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding Placeholders.RedactionSensitiveSummary}"
+                                           FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
+                                           TextWrapping="Wrap"/>
+
+                                <Separator Margin="0,10,0,10" Background="{DynamicResource AppBorderBrush}"/>
+
+                                <!-- Diagnostics: opt-in UI interaction trace -->
+                                <CheckBox Content="Verbose UI tracing (diagnostics)"
+                                          IsChecked="{Binding VerboseUiTrace}" IsEnabled="{Binding Policy[VerboseUiTrace].IsEditable}"
+                                          ToolTip="{StaticResource Help.Settings.VerboseUiTrace}"/>
+                                <TextBlock Text="Logs navigation, clicks, dialogs and view builds as [TRACE] lines in app.log. Turn on when reproducing a freeze or stall, off otherwise — it is chatty. Applies on Save, no restart needed."
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" Margin="24,2,0,0"/>
+                            </StackPanel>
+                        </Expander>
+
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+
+</UserControl>

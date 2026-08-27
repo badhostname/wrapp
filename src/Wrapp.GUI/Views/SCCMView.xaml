@@ -1,0 +1,1359 @@
+﻿<UserControl x:Class="Wrapp.Views.SCCMView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:local="clr-namespace:Wrapp"
+             xmlns:ctrl="clr-namespace:Wrapp.Controls"
+             xmlns:helpers="clr-namespace:Wrapp.Helpers"
+             AllowDrop="True"
+             DragEnter="UserControl_DragEnter"
+             DragOver="UserControl_DragOver"
+             DragLeave="UserControl_DragLeave"
+             Drop="UserControl_Drop">
+
+    <UserControl.Resources>
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <!-- Disabled hatching for conditionally disabled fields -->
+        <Style x:Key="HatchedComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource DisabledHatchBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Under-label caption for fields END USERS see in Software Center —
+             over-announce so nothing inappropriate ships. -->
+        <Style x:Key="EndUserHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="Margin" Value="0,-2,0,3"/>
+            <Setter Property="Text" Value="Visible to end users in Software Center"/>
+            <Setter Property="ToolTip" Value="End users see this value in Software Center — make sure it is appropriate for them."/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Main content -->
+        <Grid x:Name="MainContent">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <ctrl:ViewHeader Grid.Row="0"
+                             Title="SCCM"
+                             HelpKey="Help.SCCM.Overview"/>
+
+            <!-- Row 1: action toolbar spanning full width -->
+            <Border Grid.Row="1"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="12,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Button Command="{Binding AddPackageCommand}"
+                                Padding="10,5" Margin="0,0,6,0"
+                                ToolTip="{StaticResource Help.SCCM.Toolbar.Add}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Add" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding RemovePackageCommand}"
+                                Padding="10,5" Margin="0,0,6,0"
+                                IsEnabled="{Binding HasSelectedPackage}"
+                                ToolTip="{StaticResource Help.SCCM.Toolbar.Remove}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DuplicatePackageCommand}"
+                                Padding="10,5"
+                                IsEnabled="{Binding HasSelectedPackage}"
+                                ToolTip="{StaticResource Help.SCCM.Toolbar.Duplicate}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Duplicate" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ReplacePlaceholdersCommand}"
+                                Padding="10,5" Margin="6,0,0,0"
+                                IsEnabled="{Binding HasSelectedPackage}"
+                                ToolTip="{StaticResource Help.Common.ReplacePlaceholders}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8AB;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Replace placeholders" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Rectangle Width="1" Fill="{DynamicResource AppBorderBrush}" Margin="6,4"/>
+                        <Button Command="{Binding OpenDeploymentsCommand}"
+                                Padding="10,5"
+                                IsEnabled="{Binding HasSelectedPackage}"
+                                ToolTip="{StaticResource Help.SCCM.Toolbar.Deployments}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Deployments" VerticalAlignment="Center"/>
+                                <Border Background="{DynamicResource WarnBadgeBgBrush}"
+                                        CornerRadius="7" MinWidth="14" Height="14"
+                                        Padding="3,0" VerticalAlignment="Center"
+                                        Margin="6,0,0,0"
+                                        ToolTip="{StaticResource Help.Common.WarningBadge}"
+                                        Visibility="{Binding SelectedPackageDeploymentWarningCount, Converter={StaticResource IntToVis}}">
+                                    <TextBlock Text="{Binding SelectedPackageDeploymentWarningCount}" FontSize="9" FontWeight="Bold"
+                                               Foreground="{DynamicResource WarnBadgeFgBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border Background="{DynamicResource BadgeBgBrush}"
+                                        CornerRadius="7" MinWidth="14" Height="14"
+                                        Padding="3,0" VerticalAlignment="Center"
+                                        Margin="4,0,0,0"
+                                        ToolTip="{StaticResource Help.Common.ErrorBadge}"
+                                        Visibility="{Binding SelectedPackageDeploymentErrorCount, Converter={StaticResource IntToVis}}">
+                                    <TextBlock Text="{Binding SelectedPackageDeploymentErrorCount}" FontSize="9" FontWeight="Bold"
+                                               Foreground="{DynamicResource BadgeFgBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                        </Button>
+                        <Rectangle Width="1" Fill="{DynamicResource AppBorderBrush}" Margin="6,4"/>
+                        <TextBlock Text="Template:" FontSize="12"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,4,0"
+                                   ToolTip="{StaticResource Help.SCCM.Toolbar.Template}"/>
+                        <ComboBox x:Name="PackageTemplateComboBox"
+                                  MinWidth="140" FontSize="12"
+                                  SelectionChanged="PackageTemplateComboBox_SelectionChanged"
+                                  ToolTip="{StaticResource Help.SCCM.Toolbar.Template}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Name + hierarchy badge: templates that carry saved
+                                         deployments show a devices glyph with the count. -->
+                                    <StackPanel Orientation="Horizontal" ToolTip="{Binding Description}">
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                        <Border CornerRadius="7" Padding="5,1" Margin="6,0,0,0"
+                                                Background="{DynamicResource InputBgBrush}"
+                                                BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                                VerticalAlignment="Center"
+                                                ToolTip="{Binding ChildBadgeTooltip}"
+                                                Visibility="{Binding ChildCount, Converter={StaticResource IntToVis}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE770;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ChildCount}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14" Cursor="Hand"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="6,0,0,0"
+                                   MouseLeftButtonDown="SavePackageTemplate_Click">
+                            <TextBlock.ToolTip>
+                                <TextBlock x:Name="SaveTemplateTooltip"
+                                           Text="{StaticResource Help.SCCM.Toolbar.SaveTemplate}" FontFamily="Segoe UI"/>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                        <TextBlock Text="&#xE792;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14" Cursor="Hand"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="6,0,0,0"
+                                   MouseLeftButtonDown="SavePackageTemplateAs_Click">
+                            <TextBlock.ToolTip>
+                                <TextBlock Text="{StaticResource Help.SCCM.Toolbar.SaveTemplateAs}" FontFamily="Segoe UI"/>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Row 2: Collapsible SCCM Sites section -->
+            <Expander Grid.Row="2" IsExpanded="False"
+                      BorderBrush="{DynamicResource AppBorderBrush}"
+                      BorderThickness="0,0,0,1"
+                      Padding="0">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Server24" FontSize="16"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Run Text="SCCM Sites ("/>
+                            <Run Text="{Binding Tenants.SCCMSites.Count, Mode=OneWay}"/>
+                            <Run Text=")"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Expander.Header>
+                <StackPanel Margin="12,4,12,8">
+
+                    <!-- Column headers -->
+                    <Grid Margin="0,0,38,4"
+                          Visibility="{Binding Tenants.SCCMSites.Count,
+                              Converter={StaticResource IntToVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Display Name" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="Site Code" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                    </Grid>
+
+                    <!-- Site rows -->
+                    <ItemsControl ItemsSource="{Binding Tenants.SCCMSites}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,4" Padding="8,6"
+                                        Background="{DynamicResource InputBgBrush}"
+                                        CornerRadius="4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.SitesPanel.DisplayName}"
+                                                 VerticalAlignment="Center"
+                                                 Margin="0,0,8,0"/>
+                                        <TextBox Grid.Column="1"
+                                                 Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.SitesPanel.SiteCode}"
+                                                 VerticalAlignment="Center"
+                                                 Margin="0,0,8,0"
+                                                 FontFamily="Consolas" FontSize="11"/>
+                                        <Button Grid.Column="2"
+                                                Width="28" Height="28" Padding="0"
+                                                ToolTip="{StaticResource Help.SCCM.Sites.Remove}"
+                                                CommandParameter="{Binding}"
+                                                Command="{Binding DataContext.Tenants.ConfirmRemoveSCCMSiteCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                            <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="14"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Empty state -->
+                    <TextBlock Text="No sites configured."
+                               FontSize="11" FontStyle="Italic"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,2,0,4">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Tenants.SCCMSites.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- Add + Restore + Sync buttons -->
+                    <Grid Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <Button HorizontalAlignment="Left" Padding="10,4" Margin="0,0,8,0"
+                                    Command="{Binding Tenants.AddSCCMSiteCommand}"
+                                    ToolTip="{StaticResource Help.SCCM.SitesPanel.Add}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Add Site" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button HorizontalAlignment="Left" Padding="10,4"
+                                    Click="SccmSitesSyncButton_Click"
+                                    ToolTip="{StaticResource Help.SCCM.SitesPanel.Restore}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Restore..." FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Overwrite with Preferences"
+                                                  ToolTip="{StaticResource Help.SCCM.SitesPanel.RestoreOverwrite}"
+                                                  Command="{Binding Tenants.SyncSccmOverwriteFromPrefsCommand}"/>
+                                        <MenuItem Header="Add missing from Preferences"
+                                                  ToolTip="{StaticResource Help.SCCM.SitesPanel.RestoreAddMissing}"
+                                                  Command="{Binding Tenants.SyncSccmAddFromPrefsCommand}"/>
+                                        <Separator/>
+                                        <MenuItem Header="Overwrite with App Defaults"
+                                                  ToolTip="{StaticResource Help.SCCM.SitesPanel.RestoreOverwrite}"
+                                                  Command="{Binding Tenants.SyncSccmOverwriteFromDefaultsCommand}"/>
+                                        <MenuItem Header="Add missing from App Defaults"
+                                                  ToolTip="{StaticResource Help.SCCM.SitesPanel.RestoreAddMissing}"
+                                                  Command="{Binding Tenants.SyncSccmAddFromDefaultsCommand}"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                x:Name="SccmSitesHelpButton"
+                                Click="SccmSitesHelpButton_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="4,0" Margin="8,0,4,0"
+                                Cursor="Hand" VerticalAlignment="Center"
+                                ToolTip="{StaticResource Help.SCCM.SitesPanel.AboutButton}">
+                            <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="14" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Expander>
+
+            <!-- Row 3: package list + detail -->
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" MinWidth="140"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: package list -->
+                <ListBox x:Name="PackageList" Grid.Column="0"
+                         ItemsSource="{Binding SCCMPackager.Packages}"
+                         SelectedItem="{Binding SelectedPackage}"
+                         BorderThickness="0"
+                         Margin="4,8,4,8"
+                         Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="4" Padding="0">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasDuplicateName}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                <Setter Property="BorderThickness" Value="1"/>
+                                                <Setter Property="Padding" Value="2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Normal icon: the package box; a small red X badge overlaps
+                                         its corner when the package is disabled (the list's disabled
+                                         indicator — the name itself stays readable, no strikethrough).
+                                         Hidden when duplicate. -->
+                                    <Grid Grid.Column="0" Width="20" Margin="0,0,8,0"
+                                          Visibility="{Binding HasDuplicateName, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                        <Setter Property="ToolTip" Value="Disabled — excluded from packaging runs. Re-enable it in the Package State card."/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock Text="&#xE7B8;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                                   VerticalAlignment="Center" TextAlignment="Center"
+                                                   Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <!-- Filled badge: MDL2 is single-weight, so FontWeight can't
+                                             thicken the X — a solid red circle with a white X reads
+                                             far bolder at this size. -->
+                                        <Border CornerRadius="7" Width="13" Height="13"
+                                                Background="{DynamicResource ErrorBrush}"
+                                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                Margin="0,0,-5,-3"
+                                                Visibility="{Binding IsEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
+                                    <!-- Warning icon: shown when duplicate -->
+                                    <TextBlock Grid.Column="0" Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                               Foreground="{DynamicResource ErrorBrush}"
+                                               VerticalAlignment="Center" Width="20" TextAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Visibility="{Binding HasDuplicateName, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock.ToolTip>
+                                            <TextBlock FontFamily="Segoe UI" Text="{StaticResource Help.Common.PackageList.DuplicateName}"/>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                    <!-- Badges pinned to the row's far right (warn left of
+                                         error) — same inline alignment and size as the nav
+                                         rail and the Deployments-button badges. -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,2,0">
+                                        <Border Background="{DynamicResource WarnBadgeBgBrush}"
+                                                CornerRadius="7" MinWidth="14" Height="14"
+                                                Padding="3,0" VerticalAlignment="Center" Margin="4,0,0,0"
+                                                ToolTip="{StaticResource Help.Common.WarningBadge}"
+                                                Visibility="{Binding WarningCount, Converter={StaticResource IntToVis}}">
+                                            <TextBlock Text="{Binding WarningCount}" FontSize="9" FontWeight="Bold"
+                                                       Foreground="{DynamicResource WarnBadgeFgBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <Border Background="{DynamicResource BadgeBgBrush}"
+                                                CornerRadius="7" MinWidth="14" Height="14"
+                                                Padding="3,0" VerticalAlignment="Center" Margin="4,0,0,0"
+                                                ToolTip="{StaticResource Help.Common.ErrorBadge}"
+                                                Visibility="{Binding ErrorCount, Converter={StaticResource IntToVis}}">
+                                            <TextBlock Text="{Binding ErrorCount}" FontSize="9" FontWeight="Bold"
+                                                       Foreground="{DynamicResource BadgeFgBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <!-- Enabled/disabled is set in the detail pane (Package State
+                                         card); the list shows it via the slashed-circle icon. The
+                                         name only dims — it stays legible. -->
+                                    <TextBlock Grid.Column="1" Text="{Binding AppName}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Remove"
+                                      ToolTip="{StaticResource Help.SCCM.Toolbar.Remove}"
+                                      Command="{Binding PlacementTarget.Tag.RemovePackageCommand,
+                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Duplicate"
+                                      ToolTip="{StaticResource Help.SCCM.Toolbar.Duplicate}"
+                                      Command="{Binding PlacementTarget.Tag.DuplicatePackageCommand,
+                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="Deployments"
+                                      ToolTip="{StaticResource Help.SCCM.Toolbar.Deployments}"
+                                      Command="{Binding PlacementTarget.Tag.OpenDeploymentsCommand,
+                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="12"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
+
+                <!-- Splitter line -->
+                <Rectangle Grid.Column="1" Fill="{DynamicResource AppBorderBrush}"/>
+
+            <!-- Right: placeholder or detail panel -->
+            <Grid Grid.Column="2">
+
+                <!-- Placeholder shown when nothing is selected -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSelectedPackage}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <ui:SymbolIcon Symbol="BoxMultiple20" FontSize="48"
+                                   Foreground="{DynamicResource EmptyStateFgBrush}" HorizontalAlignment="Center"
+                                   Margin="0,0,0,12"/>
+                    <TextBlock Text="No package selected"
+                               FontSize="16" Foreground="{DynamicResource EmptyStateTextBrush}"
+                               HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Click + Add to create a new SCCM package"
+                               FontSize="12" Foreground="{DynamicResource EmptyStateTextBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Detail panel shown when a package is selected -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16"
+                              helpers:SmoothScroll.Enabled="True">
+                    <ScrollViewer.Style>
+                        <Style TargetType="ScrollViewer">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSelectedPackage}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ScrollViewer.Style>
+                    <StackPanel MaxWidth="860" DataContext="{Binding SelectedPackage}">
+
+                        <!-- PACKAGE STATE CARD -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Package state" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                <!-- Writes are GESTURE-ONLY (Explicit + Checked handler) — see the
+                                     Intune Package State card for the stale-write trap this
+                                     prevents. -->
+                                <RadioButton Content="Enabled" GroupName="SccmPackageState"
+                                             IsChecked="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=Explicit}"
+                                             Checked="PackageStateRadio_Checked"
+                                             VerticalAlignment="Center" Margin="0,0,16,0"
+                                             ToolTip="{StaticResource Help.Common.PackageEnabled}"/>
+                                <RadioButton Content="Disabled" GroupName="SccmPackageState"
+                                             IsChecked="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=Explicit,
+                                                 Converter={StaticResource InvertBool}}"
+                                             Checked="PackageStateRadio_Checked"
+                                             VerticalAlignment="Center" Margin="0,0,16,0"
+                                             ToolTip="{StaticResource Help.Common.PackageEnabled}"/>
+                                <TextBlock Text="Disabled packages are kept in the bundle but skipped by runs."
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- TARGET SITE CARD -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <ctrl:SectionHeader Title="Target Site"
+                                                        HelpKey="Help.SCCM.TargetSites"
+                                                        Margin="0"/>
+                                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                               Foreground="{DynamicResource WarningBrush}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"
+                                               Visibility="{Binding HasNoSite, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="A site must be selected"
+                                               FontSize="11" Foreground="{DynamicResource WarningBrush}"
+                                               VerticalAlignment="Center" Margin="4,0,0,0"
+                                               Visibility="{Binding HasNoSite, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                                <TextBlock Text="Select which SCCM site this package deploys to. Packages with no selection will be skipped."
+                                           FontSize="11" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"/>
+                                <ComboBox ItemsSource="{Binding DataContext.AvailableSites,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          SelectedValue="{Binding SiteCode, Mode=TwoWay}"
+                                          SelectedValuePath="Key"
+                                          DisplayMemberPath="DisplayName"
+                                          ToolTip="{StaticResource Help.SCCM.TargetSites}"
+                                          Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- APPLICATION INFO CARD (New-CMApplication) -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Application Info"
+                                                    HelpKey="Help.SCCM.ApplicationInfo"/>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="App Name" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AppName}"/>
+                                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                   Foreground="{DynamicResource WarningBrush}"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"
+                                                   Visibility="{Binding IsAppNameMissing, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="Required" FontSize="11"
+                                                   Foreground="{DynamicResource WarningBrush}"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"
+                                                   Visibility="{Binding IsAppNameMissing, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                   Foreground="{DynamicResource ErrorBrush}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"
+                                                   Visibility="{Binding HasDuplicateName, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="Duplicate name - package names must be unique."
+                                                   FontSize="11" Foreground="{DynamicResource ErrorBrush}"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"
+                                                   Visibility="{Binding HasDuplicateName, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                    <Border CornerRadius="4">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasDuplicateName}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="1"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </Border>
+                                </StackPanel>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Publisher" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Publisher}"/>
+                                        <TextBlock Style="{StaticResource EndUserHint}"/>
+                                        <TextBox Text="{Binding Publisher, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Owner" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Owner}"/>
+                                        <TextBox Text="{Binding Owner, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Support Contact" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.SupportContact}"/>
+                                        <TextBox Text="{Binding SupportContact, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="Description" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Description}"/>
+                                    <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Release Date" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.ReleaseDate}"/>
+                                        <TextBox Text="{Binding ReleaseDate, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.ReleaseDate}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Keywords (comma-separated)" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Keywords}"/>
+                                        <TextBlock Style="{StaticResource EndUserHint}"
+                                                   Text="Searchable by end users in Software Center"/>
+                                        <TextBox Text="{Binding Keywords, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Keywords}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Localized Name" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedName}"/>
+                                        <TextBlock Style="{StaticResource EndUserHint}"/>
+                                        <TextBox Text="{Binding LocalizedName, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedName}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Localized Description" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedDescription}"/>
+                                        <TextBlock Style="{StaticResource EndUserHint}"/>
+                                        <TextBox Text="{Binding LocalizedDescription, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LocalizedDescription}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Privacy URL" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.PrivacyUrl}"/>
+                                        <TextBox Text="{Binding PrivacyUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.PrivacyUrl}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="User Documentation URL" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.ApplicationInfo.UserDocumentation}"/>
+                                        <TextBlock Style="{StaticResource EndUserHint}"/>
+                                        <TextBox Text="{Binding UserDocumentation, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.UserDocumentation}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="Link Text" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LinkText}"/>
+                                    <TextBlock Style="{StaticResource EndUserHint}"/>
+                                    <TextBox Text="{Binding LinkText, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="{StaticResource Help.SCCM.ApplicationInfo.LinkText}"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <CheckBox Content="Featured App" IsChecked="{Binding IsFeatured}" Margin="0,0,24,0"
+                                              ToolTip="{StaticResource Help.SCCM.ApplicationInfo.Featured}"/>
+                                    <CheckBox Content="Auto Install" IsChecked="{Binding AutoInstall}"
+                                              ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AutoInstall}"/>
+                                </StackPanel>
+
+                                <!-- Icon file -->
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="Icon File" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.ApplicationInfo.IconFile}"/>
+                                    <TextBlock Style="{StaticResource EndUserHint}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Width="40" Height="40"
+                                                BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                                CornerRadius="4" Background="{DynamicResource IconBoxBgBrush}">
+                                            <Grid>
+                                                <!-- Placeholder glyph when no icon -->
+                                                <TextBlock Text="&#xE7C3;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="20" Foreground="{DynamicResource EmptyStateFgBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.SelectedPackageIconSource,
+                                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                             Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <!-- Actual icon -->
+                                                <Image Source="{Binding DataContext.SelectedPackageIconSource,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       Width="32" Height="32" Stretch="Uniform">
+                                                    <Image.Style>
+                                                        <Style TargetType="Image">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.SelectedPackageIconSource,
+                                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                             Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Image.Style>
+                                                </Image>
+                                                <!-- Warning badge when icon path is missing -->
+                                                <Border Width="16" Height="16"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                        Margin="0,0,-2,-2" CornerRadius="8"
+                                                        Background="#F5B93B"
+                                                        ToolTip="{Binding DataContext.IconPathMissingTooltip,
+                                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        Visibility="{Binding DataContext.IconPathMissing,
+                                                            RelativeSource={RelativeSource AncestorType=UserControl},
+                                                            Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="&#xE783;"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="10" Foreground="Black"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                        <ui:TextBox Grid.Column="2"
+                                                 Text="{Binding Icon, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsReadOnly="True"
+                                                 ToolTip="{StaticResource Help.SCCM.ApplicationInfo.IconFile}"
+                                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                 PlaceholderText="No icon selected"/>
+                                        <Button Grid.Column="4"
+                                                Padding="12,5"
+                                                ToolTip="{StaticResource Help.SCCM.ApplicationInfo.IconFile}"
+                                                Command="{Binding DataContext.BrowseIconCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <TextBlock Text="Browse..." VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Content="Use App Icon" Padding="8,3"
+                                                FontSize="11"
+                                                ToolTip="{StaticResource Help.SCCM.ApplicationInfo.UseAppIcon}"
+                                                Command="{Binding DataContext.UseAppIconCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                IsEnabled="{Binding DataContext.HasSelectedPackage,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                        <Button Content="Apply App Info" Padding="8,3" Margin="8,0,0,0"
+                                                FontSize="11"
+                                                ToolTip="{StaticResource Help.SCCM.AppInfo.SyncMetadata}"
+                                                Command="{Binding DataContext.ApplyAppInfoCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                IsEnabled="{Binding DataContext.HasSelectedPackage,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="App Comment" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.ApplicationInfo.AppComment}"/>
+                                    <TextBox Text="{Binding AppComment, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- DEPLOYMENT TYPE CARD (Add-CMScriptDeploymentType) -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Deployment Type"
+                                                    HelpKey="Help.SCCM.DeploymentType"/>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Deployment Type Name" Style="{StaticResource FieldLabel}"
+                                                       ToolTip="{StaticResource Help.SCCM.DeploymentType.Name}"/>
+                                            <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                       Foreground="{DynamicResource WarningBrush}"
+                                                       VerticalAlignment="Center" Margin="4,0,0,0"
+                                                       Visibility="{Binding IsNameMissing, Converter={StaticResource BoolToVis}}"/>
+                                            <TextBlock Text="Required" FontSize="11"
+                                                       Foreground="{DynamicResource WarningBrush}"
+                                                       VerticalAlignment="Center" Margin="4,0,0,0"
+                                                       Visibility="{Binding IsNameMissing, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Comment" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentType.Comment}"/>
+                                        <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Install Command" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentType.InstallCommand}"/>
+                                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                   Foreground="{DynamicResource WarningBrush}"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"
+                                                   Visibility="{Binding IsInstallCommandMissing, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="Required" FontSize="11"
+                                                   Foreground="{DynamicResource WarningBrush}"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"
+                                                   Visibility="{Binding IsInstallCommandMissing, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                    <Border Background="{DynamicResource CommandFieldBgBrush}"
+                                            BorderBrush="{DynamicResource AppBorderBrush}"
+                                            BorderThickness="1" CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource CommandFieldAccentBrush}"
+                                                    CornerRadius="3,0,0,3"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding InstallCommand, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" BorderThickness="0" Background="Transparent"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="Uninstall Command" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.DeploymentType.UninstallCommand}"/>
+                                    <Border Background="{DynamicResource CommandFieldBgBrush}"
+                                            BorderBrush="{DynamicResource AppBorderBrush}"
+                                            BorderThickness="1" CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource CommandFieldAccentBrush}"
+                                                    CornerRadius="3,0,0,3"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding UninstallCommand, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" BorderThickness="0" Background="Transparent"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="Repair Command" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.DeploymentType.RepairCommand}"/>
+                                    <Border Background="{DynamicResource CommandFieldBgBrush}"
+                                            BorderBrush="{DynamicResource AppBorderBrush}"
+                                            BorderThickness="1" CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource CommandFieldAccentBrush}"
+                                                    CornerRadius="3,0,0,3"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding RepairCommand, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" BorderThickness="0" Background="Transparent"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <TextBlock Text="Package Option" Style="{StaticResource FieldLabel}"
+                                               ToolTip="{StaticResource Help.SCCM.DeploymentType.PackageOption}"/>
+                                    <TextBox Text="{Binding PackageOption, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- DEPLOYMENT TYPE SETTINGS CARD -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Deployment Type Settings"
+                                                    HelpKey="Help.SCCM.DeploymentTypeSettings"/>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Installation Behavior" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.InstallBehavior}"/>
+                                        <ComboBox SelectedItem="{Binding InstallationBehaviorType}"
+                                                  ItemsSource="{Binding DataContext.Defaults.ValidInstallationBehaviorTypes,
+                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <ctrl:FieldLabelRow Text="Logon Requirement"
+                                                            IsFieldEnabled="{Binding FieldStates[LogonRequirementType].IsEnabled}"
+                                                            Help="{StaticResource Help.SCCM.DeploymentTypeSettings.LogonRequirement}"/>
+                                        <ComboBox SelectedItem="{Binding LogonRequirementType}"
+                                                  ItemsSource="{Binding DataContext.Defaults.ValidLogonRequirementTypes,
+                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  Style="{StaticResource HatchedComboBox}"
+                                                  IsEnabled="{Binding FieldStates[LogonRequirementType].IsEnabled}"
+                                                  ToolTip="{Binding FieldStates[LogonRequirementType].DisabledReason, TargetNullValue={StaticResource Help.SCCM.DeploymentTypeSettings.LogonRequirement}}"
+                                                  ToolTipService.ShowOnDisabled="True"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="User Interaction Mode" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.UserInteractionMode}"/>
+                                        <ComboBox SelectedItem="{Binding UserInteractionMode}"
+                                                  ItemsSource="{Binding DataContext.Defaults.ValidUserInteractionModes,
+                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Reboot Behavior" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.RebootBehaviorTooltip}"/>
+                                        <ComboBox SelectedItem="{Binding RebootBehavior}"
+                                                  ItemsSource="{Binding DataContext.Defaults.ValidRebootBehaviors,
+                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Estimated Runtime (mins)" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.EstimatedRuntime}"/>
+                                        <TextBox Text="{Binding EstimatedRuntimeMins, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Maximum Runtime (mins)" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.MaxRuntime}"/>
+                                        <TextBox Text="{Binding MaximumAllowedRuntimeMins, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Slow Network Mode" Style="{StaticResource FieldLabel}"
+                                                   ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.SlowNetwork}"/>
+                                        <ComboBox SelectedItem="{Binding SlowNetworkDeploymentMode}"
+                                                  ItemsSource="{Binding DataContext.Defaults.ValidSlowNetworkDeploymentModes,
+                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox Content="Run as 32-bit on 64-bit" IsChecked="{Binding InstallBehavior}" Margin="0,0,24,0"
+                                              ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.Force32Bit}"/>
+                                    <CheckBox Content="Content Fallback" IsChecked="{Binding ContentFallback}"
+                                              ToolTip="{StaticResource Help.SCCM.DeploymentTypeSettings.ContentFallback}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- INSTALL BEHAVIORS CARD (processes to close) -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Install Behaviors"
+                                                    HelpKey="Help.SCCM.InstallBehaviors"/>
+                                <TextBlock Text="Processes that should be closed before installation."
+                                           FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Padding="12,4" Margin="0,0,8,0"
+                                            ToolTip="{StaticResource Help.Common.Grid.Add}"
+                                            Command="{Binding DataContext.AddInstallBehaviorCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Add" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="12,4"
+                                            ToolTip="{StaticResource Help.Common.Grid.Remove}"
+                                            Command="{Binding DataContext.RemoveSelectedInstallBehaviorsCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            IsEnabled="{Binding DataContext.InstallBehaviorsSelection.HasSelected,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding InstallBehaviors}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                          AutoGenerateColumns="False" CanUserAddRows="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          SelectionMode="Extended" MinHeight="60" MaxHeight="200"
+                                          HorizontalAlignment="Stretch">
+                                    <DataGrid.Resources>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                                    </DataGrid.Resources>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="Auto" IsReadOnly="True" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="*">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="Exe File Name" ToolTip="{StaticResource Help.SCCM.InstallBehaviors.ExeFileName}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding ExeFileName, UpdateSourceTrigger=PropertyChanged}"
+                                                             ToolTip="{StaticResource Help.SCCM.InstallBehaviors.ExeFileName}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="*">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="Display Name" ToolTip="{StaticResource Help.SCCM.InstallBehaviors.DisplayName}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                                                             ToolTip="{StaticResource Help.SCCM.InstallBehaviors.DisplayName}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- DEPENDENCIES CARD -->
+                        <Border Style="{StaticResource FormCard}">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Dependencies"
+                                                    HelpKey="Help.SCCM.Dependencies"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Padding="12,4" Margin="0,0,8,0"
+                                            ToolTip="{StaticResource Help.Common.Grid.Add}"
+                                            Command="{Binding DataContext.AddDependencyCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Add" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="12,4" Margin="0,0,8,0"
+                                            Click="BrowseSccmDependency_Click"
+                                            ToolTip="{StaticResource Help.SCCM.Dependencies.Browse}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Browse" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="12,4"
+                                            ToolTip="{StaticResource Help.Common.Grid.Remove}"
+                                            Command="{Binding DataContext.RemoveSelectedDependenciesCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            IsEnabled="{Binding DataContext.DependenciesSelection.HasSelected,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding Dependencies}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                          AutoGenerateColumns="False" CanUserAddRows="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          SelectionMode="Extended" MinHeight="60" MaxHeight="200"
+                                          HorizontalAlignment="Stretch">
+                                    <DataGrid.Resources>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                                    </DataGrid.Resources>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="Auto" IsReadOnly="True" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="*">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="App Name" ToolTip="{StaticResource Help.SCCM.Dependencies.AppName}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}"
+                                                             ToolTip="{StaticResource Help.SCCM.Dependencies.AppName}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Auto Install" Width="Auto">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding AutoInstall, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              ToolTip="{StaticResource Help.SCCM.Dependencies.AutoInstall}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- SUPERSEDENCE CARD -->
+                        <Border Style="{StaticResource FormCard}" Margin="0,0,0,24">
+                            <StackPanel>
+                                <ctrl:SectionHeader Title="Supersedence"
+                                                    HelpKey="Help.SCCM.Supersedence"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Padding="12,4" Margin="0,0,8,0"
+                                            ToolTip="{StaticResource Help.Common.Grid.Add}"
+                                            Command="{Binding DataContext.AddSupersedenceCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Add" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="12,4" Margin="0,0,8,0"
+                                            Click="BrowseSccmSupersedence_Click"
+                                            ToolTip="{StaticResource Help.SCCM.Supersedence.Browse}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Browse" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Padding="12,4"
+                                            ToolTip="{StaticResource Help.Common.Grid.Remove}"
+                                            Command="{Binding DataContext.RemoveSelectedSupersedenceCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            IsEnabled="{Binding DataContext.SupersedenceSelection.HasSelected,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE738;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding Supersedence}" CellStyle="{StaticResource DirectEditCellStyle}"
+                                          AutoGenerateColumns="False" CanUserAddRows="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          SelectionMode="Extended" MinHeight="60" MaxHeight="200"
+                                          HorizontalAlignment="Stretch">
+                                    <DataGrid.Resources>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                                    </DataGrid.Resources>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="Auto" IsReadOnly="True" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="*">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="App Name" ToolTip="{StaticResource Help.SCCM.Supersedence.AppName}"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}"
+                                                             ToolTip="{StaticResource Help.SCCM.Supersedence.AppName}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Type" Width="140" IsReadOnly="True">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox SelectedItem="{Binding SupersedenceType, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              ItemsSource="{Binding DataContext.Defaults.ValidSupersedenceTypes,
+                                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              ToolTip="{StaticResource Help.SCCM.Supersedence.Type}"
+                                                              BorderThickness="0" Background="Transparent" Padding="2,0"
+                                                              VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Uninstall Old" Width="Auto">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding UninstallOldApp, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              ToolTip="{StaticResource Help.SCCM.Supersedence.UninstallOnReplace}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- DRAG OVERLAY: image drop feedback -->
+        <Grid x:Name="DragOverlay"
+              Visibility="Collapsed"
+              Panel.ZIndex="10">
+            <Grid.Background>
+                <SolidColorBrush Color="#000000" Opacity="0.65"/>
+            </Grid.Background>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsHitTestVisible="False">
+                <TextBlock x:Name="DragValidIcon"
+                           Text="&#xE898;" FontFamily="Segoe MDL2 Assets"
+                           FontSize="72" Foreground="#6FD46F"
+                           HorizontalAlignment="Center"/>
+                <TextBlock x:Name="DragInvalidIcon"
+                           Text="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                           FontSize="72" Foreground="#E05C5C"
+                           HorizontalAlignment="Center"
+                           Visibility="Collapsed"/>
+                <TextBlock x:Name="DragOverlayHint"
+                           FontSize="18" FontWeight="SemiBold"
+                           Foreground="White"
+                           Margin="0,16,0,0"
+                           HorizontalAlignment="Center"/>
+                <TextBlock x:Name="DragOverlaySubHint"
+                           FontSize="12"
+                           Foreground="#AAAAAA"
+                           Margin="0,4,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+    </Grid>
+</UserControl>

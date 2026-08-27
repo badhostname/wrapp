@@ -1,0 +1,178 @@
+=======================================================================
+ Wrapp — THIRD-PARTY NOTICES
+=======================================================================
+
+Wrapp (© 2026 badhostname, MIT — see LICENSE) bundles and builds against
+the third-party components listed below. Each is redistributed as part of
+the build output under its own license, and those licenses are preserved
+here. Downstream redistributors are responsible for complying with every
+component's terms — in particular the GPL-2.0 (git), LGPL-2.1 (PSADT), and
+the Microsoft SDK EULA (WebView2) obligations, which go beyond Wrapp's own
+MIT license.
+
+Versions reflect the shipped set as of Wrapp 0.6.0.0256. For the exact,
+hash-pinned dependency graph see `src/Wrapp.GUI/packages.lock.json` and the
+generated `sbom.json` (CycloneDX).
+
+-----------------------------------------------------------------------
+ COMPONENT SUMMARY
+-----------------------------------------------------------------------
+
+NuGet packages (direct):
+  CommunityToolkit.Mvvm                 8.4.0     MIT
+  MaterialDesignThemes                  5.3.0     MIT
+  WPF-UI                                4.2.0     MIT
+  Microsoft.Web.WebView2                1.0.3800.47  Microsoft SDK EULA (redistributable)
+  Microsoft.PowerShell.SDK              7.4.4     MIT
+  Microsoft.Identity.Client (MSAL.NET)  4.67.2    MIT
+  Microsoft.Identity.Client.Broker      4.67.2    MIT
+  Microsoft.Identity.Client.Extensions.Msal 4.67.2 MIT
+  Git-Windows-Minimal                   2.53.0    GPL-2.0-only (bundled git binaries)
+
+NuGet packages (notable transitive):
+  Markdig.Signed                        (via PowerShell.SDK)  BSD-2-Clause
+
+Vendored components (under Assets/ and modules/):
+  Monaco Editor                         (Assets/monaco)       MIT
+  IntuneWin32App                        1.5.0 (modules/)      MIT
+  PSAppDeployToolkit (PSADT)            4.1.8 (modules/)      LGPL-2.1
+  Appease                               2.3  (modules/)      License not stated — see note
+
+First-party (not third-party, listed for clarity):
+  Wrapp.Packager                        (modules/)            MIT (part of Wrapp)
+
+-----------------------------------------------------------------------
+ ATTRIBUTIONS & SOURCES
+-----------------------------------------------------------------------
+
+CommunityToolkit.Mvvm — MIT
+  Copyright (c) .NET Foundation and Contributors
+  https://github.com/CommunityToolkit/dotnet
+
+MaterialDesignThemes — MIT
+  Copyright (c) James Willock, Mulholland Software
+  https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit
+
+WPF-UI — MIT
+  Copyright (c) Leszek Pomianowski and WPF UI Contributors
+  https://github.com/lepoco/wpfui
+
+Microsoft.Web.WebView2 — Microsoft Software License Terms (SDK EULA)
+  Copyright (c) Microsoft Corporation
+  Redistribution of the WebView2 runtime/SDK is permitted under the SDK
+  license terms. https://developer.microsoft.com/microsoft-edge/webview2/
+  The Evergreen runtime is installed/updated by the OS, not redistributed
+  by Wrapp; the SDK assemblies are redistributed under the above terms.
+
+Microsoft.PowerShell.SDK — MIT
+  Copyright (c) Microsoft Corporation
+  https://github.com/PowerShell/PowerShell
+
+Microsoft.Identity.Client (MSAL.NET), .Broker, .Extensions.Msal — MIT
+  Copyright (c) Microsoft Corporation
+  https://github.com/AzureAD/microsoft-authentication-library-for-dotnet
+
+Git-Windows-Minimal — GPL-2.0-only
+  Bundled MinGit binaries used for Wrapp's git operations.
+  Copyright (c) Git contributors / Software Freedom Conservancy.
+  https://github.com/git-for-windows/git
+  Full license text: GNU General Public License v2.0. The git distribution
+  ships its own COPYING; obligations under GPL-2.0 apply to the bundled
+  git binaries (offer of corresponding source, etc.).
+
+Markdig.Signed — BSD-2-Clause
+  Copyright (c) Alexandre Mutel
+  Arrives transitively via Microsoft.PowerShell.SDK (PowerShell Markdown
+  cmdlets); not a Wrapp-chosen dependency, listed for redistribution.
+  https://github.com/xoofx/markdig
+
+Monaco Editor — MIT
+  Copyright (c) Microsoft Corporation
+  Bundled offline under `src/Wrapp.GUI/Assets/monaco/` (no CDN dependency).
+  https://github.com/microsoft/monaco-editor
+
+IntuneWin32App — MIT
+  Copyright (c) 2020 MSEndpointMgr (Nickolaj Andersen)
+  Vendored at `modules/IntuneWin32App/1.5.0/`; the module's own MIT LICENSE
+  is retained at `modules/IntuneWin32App/1.5.0/LICENSE`.
+  https://github.com/MSEndpointMgr/IntuneWin32App
+
+PSAppDeployToolkit (PSADT) — LGPL-2.1
+  Copyright (c) PSAppDeployToolkit Team
+  Vendored deployment framework template at `modules/psadt-template/`; the
+  LGPL text is retained at
+  `modules/psadt-template/PSAppDeployToolkit/COPYING.Lesser`.
+  https://github.com/PSAppDeployToolkit/PSAppDeployToolkit
+
+Appease (v2.3) — LICENSE NOT STATED
+  Authored by Gordon P. Martin. Vendored as a
+  packaging-environment template at `modules/appease-template/`. The
+  vendored copy does not include an accompanying license file, so its
+  redistribution terms are UNCONFIRMED. This attribution is provided in
+  good faith; downstream redistributors should confirm licensing with the
+  original author before redistributing this component.
+  see Wrapp Phase 17 plan §5 / open licensing question.)
+
+-----------------------------------------------------------------------
+ LICENSE TEXTS
+-----------------------------------------------------------------------
+
+The MIT-licensed components above are governed by the following text
+(copyright as attributed to each component):
+
+  MIT License
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit
+  persons to whom the Software is furnished to do so, subject to the
+  following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+  NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+  USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Markdig.Signed is governed by the BSD 2-Clause License:
+
+  Copyright (c) Alexandre Mutel. All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The full texts of the GPL-2.0 (Git-Windows-Minimal), LGPL-2.1 (PSADT), and
+the Microsoft SDK EULA (WebView2) are provided by those components' own
+distributions and, for the vendored modules, are retained alongside them:
+  - PSADT:          modules/psadt-template/PSAppDeployToolkit/COPYING.Lesser
+  - IntuneWin32App: modules/IntuneWin32App/1.5.0/LICENSE
+  - Git:            see the Git for Windows distribution COPYING (GPL-2.0)
+  - WebView2:       https://developer.microsoft.com/microsoft-edge/webview2/
+
+=======================================================================

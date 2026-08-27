@@ -1,0 +1,867 @@
+<Application x:Class="Wrapp.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:local="clr-namespace:Wrapp"
+             xmlns:helpers="clr-namespace:Wrapp.Helpers">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Wpf.Ui Fluent dark theme + control templates -->
+                <ui:ThemesDictionary Theme="Dark"/>
+                <ui:ControlsDictionary/>
+                <ResourceDictionary Source="Help/HelpContent.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Diagonal hatching brush for disabled fields -->
+            <DrawingBrush x:Key="DisabledHatchBrush" TileMode="Tile"
+                          Viewport="0,0,6,6" ViewportUnits="Absolute">
+                <DrawingBrush.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing>
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#18888888" Thickness="1"/>
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <LineGeometry StartPoint="0,6" EndPoint="6,0"/>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingBrush.Drawing>
+            </DrawingBrush>
+
+            <!-- Converter: bool -> !bool (for IsEnabled bindings) -->
+            <local:InvertBoolConverter x:Key="InvertBool"/>
+            <!-- Converter: string match -> Visibility (supports pipe-separated multi-match) -->
+            <local:StringMatchToVisibilityConverter x:Key="StringMatchToVis"/>
+            <!-- Converter: bool -> Visibility (inverse: true = Collapsed, false = Visible) -->
+            <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+            <!-- Converter: bool -> Visibility (true = Visible, false = Collapsed) -->
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <!-- Converter: int -> Visibility (0 = Collapsed, > 0 = Visible) -->
+            <local:IntToVisibilityConverter x:Key="IntToVis"/>
+            <!-- Converter: ConnectionState -> Brush (connection status lines) -->
+            <local:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrush"/>
+            <!-- Converter: PackageOutcome -> Brush (progress table status) -->
+            <local:PackageOutcomeToBrushConverter x:Key="OutcomeToBrush"/>
+            <!-- Converter: strip Markdown formatting (used by global ToolTip style) -->
+            <local:MarkdownToPlainTextConverter x:Key="MarkdownToPlain"/>
+
+            <!-- DataTemplate keyed by selector below; only string tooltip
+                 content goes through the converter. Property-element tooltips
+                 (`<Button.ToolTip><TextBlock .../></Button.ToolTip>` etc.)
+                 render unchanged.
+                 Foreground / Font* are pulled directly from the ancestor
+                 ToolTip via RelativeSource so wpf-ui's themed values reach
+                 the TextBlock — without these explicit binds, replacing the
+                 ContentPresenter's template knocks the text out of the
+                 inherited-property chain and tooltips render with WPF's
+                 system defaults (black on light grey, Segoe UI 12pt). -->
+            <DataTemplate x:Key="ToolTipStringTemplate">
+                <TextBlock Text="{Binding Converter={StaticResource MarkdownToPlain}}"
+                           TextWrapping="Wrap"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToolTip}}"
+                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToolTip}}"
+                           FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=ToolTip}}"
+                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToolTip}}"
+                           FontStyle="{Binding FontStyle, RelativeSource={RelativeSource AncestorType=ToolTip}}"/>
+            </DataTemplate>
+            <local:ToolTipContentTemplateSelector x:Key="ToolTipSelector"
+                                                  StringTemplate="{StaticResource ToolTipStringTemplate}"/>
+
+            <!-- ============================================================
+                 Global ToolTip style: strip Markdown so help-content keys
+                 (which carry **bold** / `code` for the rich popup viewer)
+                 render as clean plain text in tooltips. Also nudges WPF's
+                 default TextFormattingMode from Display (sub-pixel snapping
+                 that produces uneven word spacing) to Ideal (smoother
+                 kerning at the cost of a tiny rasterisation softness).
+                 ============================================================ -->
+            <Style TargetType="ToolTip" BasedOn="{StaticResource {x:Type ToolTip}}">
+                <Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/>
+                <Setter Property="MaxWidth" Value="380"/>
+                <!-- Explicit theme-aware surface colours. BasedOn the implicit
+                     wpf-ui style above wasn't reliably inheriting Background /
+                     BorderBrush — tooltips fell back to WPF's system-default
+                     light grey. Wiring these directly to our own DynamicResource
+                     brushes so dark/light theme toggles swap them correctly. -->
+                <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="Padding" Value="8,5"/>
+                <Setter Property="ContentTemplateSelector" Value="{StaticResource ToolTipSelector}"/>
+            </Style>
+
+            <!-- ============================================================
+                 Nav sidebar item style
+                 RadioButton styled as a flat dark-mode nav item.
+                 ============================================================ -->
+            <Style x:Key="NavItem" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <!-- Row layout: icon left, label center, badges far right —
+                     content stretches so badge columns pin to the row's right
+                     edge in BOTH states (collapsed rail included; the label is
+                     hidden by NavLabel's own trigger). -->
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Padding" Value="10,7"/>
+                <Setter Property="Margin" Value="4,1"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="Root" CornerRadius="4"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                        <Condition Property="IsChecked" Value="False"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DataContext.IsNavCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Padding" Value="6,7"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ============================================================
+                 Shared form styles - used in all section views
+                 VS Code-style dark palette: visible cards on #1e1e1e base.
+                 ============================================================ -->
+
+            <!-- Small secondary label above each field.
+                 The Loaded handler copies a label's ToolTip (e.g. a help resource)
+                 to the first input sibling in its parent panel, so users see the
+                 same help whether they hover the label or the field itself. -->
+            <Style x:Key="FieldLabel" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Setter Property="Margin" Value="0,0,0,4"/>
+                <EventSetter Event="Loaded" Handler="FieldLabel_Loaded"/>
+            </Style>
+
+            <!-- Card container: clearly elevated above the #1e1e1e window base -->
+            <Style x:Key="FormCard" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="Padding" Value="16"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+
+            <!-- Bold section heading inside a FormCard -->
+            <Style x:Key="FormCardHeader" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+            </Style>
+
+            <!-- Accent button: neutral theme-aware, no system accent dependency -->
+            <Style x:Key="AccentButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource AccentBgBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AccentFgBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Root"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource DisabledBgBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource DisabledFgBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Command-bar toolbar button
+                 Flat transparent button for the command bar strip.
+                 ============================================================ -->
+            <Style x:Key="ToolbarBtn" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Padding" Value="10,6"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Root" CornerRadius="4"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Expandable FormCard - dark Expander replacing plain Border card
+                 ============================================================ -->
+            <Style x:Key="FormCardExpander" TargetType="Expander">
+                <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+                <Setter Property="Padding" Value="16"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Expander">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    Margin="{TemplateBinding Margin}">
+                                <StackPanel>
+                                    <!-- Header toggle button -->
+                                    <ToggleButton x:Name="HeaderSite"
+                                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                                              RelativeSource={RelativeSource TemplatedParent}}"
+                                                  Focusable="False"
+                                                  FocusVisualStyle="{x:Null}"
+                                                  Cursor="Hand">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent" Padding="16,12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Header, RelativeSource={RelativeSource AncestorType=Expander}}"
+                                                                   FontSize="13" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="ArrowDown" Grid.Column="1"
+                                                                   Text="&#xE70D;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="8,0,0,0"/>
+                                                        <TextBlock x:Name="ArrowUp" Grid.Column="1"
+                                                                   Text="&#xE70E;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="8,0,0,0"
+                                                                   Visibility="Collapsed"/>
+                                                    </Grid>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="ArrowDown" Property="Visibility" Value="Collapsed"/>
+                                                        <Setter TargetName="ArrowUp" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <!-- Separator line between header and content -->
+                                    <Rectangle x:Name="Separator" Fill="{DynamicResource AppBorderBrush}" Height="1">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsExpanded,
+                                                        RelativeSource={RelativeSource AncestorType=Expander}}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <!-- Content area -->
+                                    <ContentPresenter x:Name="ExpandSite"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      Visibility="Collapsed"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsExpanded" Value="True">
+                                    <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Settings page expander: same as FormCardExpander but uses
+                 ContentPresenter for the header so icon+title+description
+                 can be placed in the Header property. -->
+            <Style x:Key="SettingsCardExpander" TargetType="Expander">
+                <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Margin" Value="0,0,0,12"/>
+                <Setter Property="Padding" Value="16"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Expander">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    Margin="{TemplateBinding Margin}">
+                                <StackPanel>
+                                    <ToggleButton x:Name="HeaderSite"
+                                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                                              RelativeSource={RelativeSource TemplatedParent}}"
+                                                  HorizontalAlignment="Stretch"
+                                                  HorizontalContentAlignment="Stretch"
+                                                  Focusable="False"
+                                                  FocusVisualStyle="{x:Null}"
+                                                  Cursor="Hand">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent" Padding="16,12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <ContentPresenter Grid.Column="0"
+                                                                          Content="{Binding Header,
+                                                                              RelativeSource={RelativeSource AncestorType=Expander}}"
+                                                                          HorizontalAlignment="Stretch"
+                                                                          VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="ArrowDown" Grid.Column="1"
+                                                                   Text="&#xE70D;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="12,0,0,0"/>
+                                                        <TextBlock x:Name="ArrowUp" Grid.Column="1"
+                                                                   Text="&#xE70E;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="12,0,0,0"
+                                                                   Visibility="Collapsed"/>
+                                                    </Grid>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="ArrowDown" Property="Visibility" Value="Collapsed"/>
+                                                        <Setter TargetName="ArrowUp" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <Rectangle x:Name="Separator" Fill="{DynamicResource AppBorderBrush}" Height="1">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsExpanded,
+                                                        RelativeSource={RelativeSource AncestorType=Expander}}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <ContentPresenter x:Name="ExpandSite"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      Visibility="Collapsed"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsExpanded" Value="True">
+                                    <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Global DataGrid dark theme overrides
+                 WPF DataGrid ignores Wpf.Ui theme brushes by default; these
+                 styles force VS Code palette colors throughout all DataGrids.
+                 ============================================================ -->
+
+            <Style TargetType="DataGrid">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="RowBackground" Value="{DynamicResource TableInteriorBgBrush}"/>
+                <Setter Property="AlternatingRowBackground" Value="{DynamicResource RowAltBrush}"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="VerticalGridLinesBrush" Value="Transparent"/>
+                <Setter Property="SelectionMode" Value="Single"/>
+                <Setter Property="CanUserResizeRows" Value="False"/>
+                <Setter Property="RowHeaderWidth" Value="0"/>
+                <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
+                <Setter Property="helpers:ScrollBubbling.BubbleScroll" Value="True"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGrid">
+                            <Border x:Name="border"
+                                    SnapsToDevicePixels="True"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    ClipToBounds="True"
+                                    Padding="{TemplateBinding Padding}">
+                                <ScrollViewer x:Name="DG_ScrollViewer" Focusable="False" Background="Transparent">
+                                    <ScrollViewer.Template>
+                                        <ControlTemplate TargetType="ScrollViewer">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <DataGridColumnHeadersPresenter
+                                                    x:Name="PART_ColumnHeadersPresenter"
+                                                    Grid.Column="1"
+                                                    Visibility="{Binding HeadersVisibility,
+                                                        ConverterParameter={x:Static DataGridHeadersVisibility.Column},
+                                                        Converter={x:Static DataGrid.HeadersVisibilityConverter},
+                                                        RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"/>
+                                                <ScrollContentPresenter
+                                                    x:Name="PART_ScrollContentPresenter"
+                                                    Grid.Column="1" Grid.Row="1"
+                                                    CanContentScroll="{TemplateBinding CanContentScroll}"/>
+                                                <ScrollBar x:Name="PART_VerticalScrollBar"
+                                                    Grid.Column="2" Grid.Row="0" Grid.RowSpan="2"
+                                                    Orientation="Vertical"
+                                                    Value="{TemplateBinding VerticalOffset}"
+                                                    Maximum="{TemplateBinding ScrollableHeight}"
+                                                    ViewportSize="{TemplateBinding ViewportHeight}"
+                                                    Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                                                <Grid Grid.Column="1" Grid.Row="2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="{Binding NonFrozenColumnsViewportHorizontalOffset,
+                                                            RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Value="{TemplateBinding HorizontalOffset}"
+                                                        Maximum="{TemplateBinding ScrollableWidth}"
+                                                        ViewportSize="{TemplateBinding ViewportWidth}"
+                                                        Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+                                                </Grid>
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </ScrollViewer.Template>
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </ScrollViewer>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="DataGridRow">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource NavSelectedFgBrush}"/>
+                    </Trigger>
+                    <MultiTrigger>
+                        <MultiTrigger.Conditions>
+                            <Condition Property="IsMouseOver" Value="True"/>
+                            <Condition Property="IsSelected" Value="False"/>
+                        </MultiTrigger.Conditions>
+                        <Setter Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                    </MultiTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style TargetType="DataGridCell">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8,4"/>
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource NavSelectedFgBrush}"/>
+                    </Trigger>
+                    <MultiTrigger>
+                        <MultiTrigger.Conditions>
+                            <Condition Property="IsMouseOver" Value="True"/>
+                            <Condition Property="IsSelected" Value="False"/>
+                        </MultiTrigger.Conditions>
+                        <Setter Property="Background" Value="{DynamicResource CellHoverBrush}"/>
+                    </MultiTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ============================================================
+                 Cells that host ALWAYS-ON editors (the DetectionView table
+                 pattern: a transparent TextBox in a template column).
+
+                 A focusable DataGridCell consumes the FIRST mouse-down for
+                 its own focus/selection before the inner editor ever sees
+                 it, so the caret lands at index 0 and only a SECOND click
+                 positions where the user actually clicked. Non-focusable
+                 cells pass the click straight through to the editor, which
+                 then places the caret at the click point on the FIRST click.
+
+                 Apply ONLY to grids whose text cells are always-on editors.
+                 Read-only / selection-driven grids (registry values picker,
+                 run progress, batch results) must keep cell focus, since
+                 their selection semantics depend on it.
+                 ============================================================ -->
+            <Style x:Key="DirectEditCellStyle" TargetType="DataGridCell"
+                   BasedOn="{StaticResource {x:Type DataGridCell}}">
+                <Setter Property="Focusable" Value="False"/>
+                <!-- Caret placement is handled app-wide by Helpers.ClickToCaret
+                     (registered in App.OnStartup), which pre-focuses the editor
+                     before the grid's currency logic can steal focus back. -->
+            </Style>
+
+            <!-- The always-on editor inside a DataGridTemplateColumn cell.
+                 Pair with DirectEditCellStyle on the grid's CellStyle; apply to
+                 a whole grid at once with:
+                   <DataGrid.Resources>
+                     <Style TargetType="TextBox" BasedOn="{StaticResource GridCellEditor}"/>
+                   </DataGrid.Resources>
+                 so individual cell TextBoxes need no repeated attributes. -->
+            <Style x:Key="GridCellEditor" TargetType="TextBox"
+                   BasedOn="{StaticResource {x:Type TextBox}}">
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Padding" Value="4,2"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{DynamicResource TableHeaderBgBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="8,6"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            </Style>
+
+            <!-- NOTE: the global ComboBox wheel fix lives in App.OnStartup as a
+                 ScrollBubbling CLASS HANDLER, deliberately NOT an implicit
+                 style here: an implicit ComboBox style (even with BasedOn)
+                 shadows Wpf.Ui's dynamically-applied theme style and strips
+                 the themed dropdown look (regression caught 2026-08-12). -->
+
+            <!-- Shared row spacing inside form grids -->
+            <Thickness x:Key="FieldRowMargin">0,0,0,12</Thickness>
+            <Thickness x:Key="FieldColGap">16,0,0,0</Thickness>
+
+            <!-- Badge group on a nav row. Expanded: a horizontal run pinned to
+                 the row's far right (matches the Assignments-button badges).
+                 Collapsed: the badges STACK vertically and pull left over the
+                 icon's right edge — both stay fully visible and the rail can
+                 stay narrow. -->
+            <Style x:Key="NavBadgeStack" TargetType="StackPanel">
+                <Setter Property="Orientation" Value="Horizontal"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DataContext.IsNavCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Orientation" Value="Vertical"/>
+                        <Setter Property="Margin" Value="-12,0,0,0"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Nav label: sits to the RIGHT of its icon in a sidebar row.
+                 Hidden entirely while the sidebar is collapsed to icons only
+                 (the hamburger toggles MainViewModel.IsNavCollapsed). -->
+            <Style x:Key="NavLabel" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextWrapping" Value="NoWrap"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="Margin" Value="10,0,0,0"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DataContext.IsNavCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ============================================================
+                 Custom CheckBox: overrides Wpf.Ui default to use app accent
+                 colors instead of Windows system accent color.
+                 ============================================================ -->
+            <Style TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+                <Setter Property="Padding" Value="6,0,0,0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CheckBox">
+                            <Grid x:Name="Root" SnapsToDevicePixels="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="CheckBorder"
+                                        Width="26" Height="26"
+                                        CornerRadius="4"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CheckGlyph"
+                                           Grid.Column="0"
+                                           Text="&#xE73E;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="17"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource CheckGlyphBrush}"
+                                           Visibility="Collapsed"/>
+                                <ContentPresenter Grid.Column="1"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="CheckBorder" Property="Background"
+                                            Value="{DynamicResource CheckAccentBrush}"/>
+                                    <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                            Value="{DynamicResource CheckAccentBrush}"/>
+                                    <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsChecked" Value="True"/>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="CheckBorder" Property="Background"
+                                            Value="{DynamicResource CheckAccentHoverBrush}"/>
+                                    <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                            Value="{DynamicResource CheckAccentHoverBrush}"/>
+                                </MultiTrigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsChecked" Value="False"/>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                            Value="{DynamicResource CheckAccentBrush}"/>
+                                </MultiTrigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Custom ListBoxItem: overrides selection colors to use app
+                 accent instead of system accent. Applies to package lists
+                 in Intune/SCCM views and git history.
+                 ============================================================ -->
+            <Style TargetType="ListBoxItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Padding" Value="8,6"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background"
+                                            Value="{DynamicResource NavSelectedBrush}"/>
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                        <Condition Property="IsSelected" Value="False"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="Bd" Property="Background"
+                                            Value="{DynamicResource NavHoverBrush}"/>
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Normal button style for Add, Remove, Duplicate, Browse, etc.
+                 Uses the table-header/dropdown color scheme.
+                 ============================================================ -->
+            <Style TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource NormalBtnBgBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource NormalBtnFgBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource NormalBtnBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="12,5"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Root"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Root" Property="Background"
+                                            Value="{DynamicResource NormalBtnHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Root" Property="Background"
+                                            Value="{DynamicResource NormalBtnPressedBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Root" Property="Background"
+                                            Value="{DynamicResource DisabledBgBrush}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource DisabledFgBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Custom TabItem style for TenantsView (Intune/SCCM tabs).
+                 Overrides Wpf.Ui default to use app accent indicator.
+                 ============================================================ -->
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="TabBorder"
+                                    Background="{DynamicResource SidebarBgBrush}"
+                                    BorderThickness="0,0,0,2"
+                                    BorderBrush="Transparent"
+                                    Padding="16,8"
+                                    Margin="0,0,1,0"
+                                    SnapsToDevicePixels="True">
+                                <TextBlock x:Name="TabText"
+                                           Text="{TemplateBinding Header}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="TabBorder" Property="BorderBrush"
+                                            Value="{DynamicResource TabIndicatorBrush}"/>
+                                    <Setter TargetName="TabBorder" Property="Background"
+                                            Value="{DynamicResource AppBgBrush}"/>
+                                    <Setter TargetName="TabText" Property="Foreground"
+                                            Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                        <Condition Property="IsSelected" Value="False"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="TabBorder" Property="Background"
+                                            Value="{DynamicResource NavHoverBrush}"/>
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
