@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- G5: strict CSP. Scripts only from monaco.local (no inline script);
+         'unsafe-inline' styles are required by Monaco's injected <style> tags.
+         Workers are blob: (Monaco's worker bootstrap); blob workers inherit
+         this CSP, so their importScripts() is still pinned to monaco.local. -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; script-src https://monaco.local; style-src https://monaco.local 'unsafe-inline'; font-src https://monaco.local; img-src https://monaco.local data:; worker-src blob:; child-src blob:; connect-src https://monaco.local; base-uri 'none'; form-action 'none'; object-src 'none'"/>
+    <meta charset="utf-8"/>
+    <style>
+        html, body, #container { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script src="https://monaco.local/vs/loader.js"></script>
+    <script src="https://monaco.local/editor.js"></script>
+</body>
+</html>

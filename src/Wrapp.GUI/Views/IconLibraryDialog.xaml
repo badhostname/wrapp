@@ -1,0 +1,103 @@
+<UserControl x:Class="Wrapp.Views.IconLibraryDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:Wrapp.Controls"
+             xmlns:helpers="clr-namespace:Wrapp.Helpers"
+             Width="640" MaxHeight="560">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="190"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: search + paged results -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <ctrl:SectionHeader Grid.Row="0" Title="Icon Library"
+                                HelpKey="Help.IconLibrary.Overview" Margin="0,0,0,-4"/>
+
+            <DockPanel Grid.Row="1" Margin="0,4,0,8">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding ResultSummary}"
+                           FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="6,4"
+                         ToolTip="{StaticResource Help.IconLibrary.Search}"/>
+            </DockPanel>
+
+            <!-- Fixed height: the results area is scroll-bound from the first
+                 paint, so loading more rows (or narrowing a search) never
+                 resizes the pop-up. Show more lives INSIDE the scroll area,
+                 after the last row - reaching it means scrolling the icons. -->
+            <ScrollViewer Grid.Row="2" Height="440" VerticalScrollBarVisibility="Auto"
+                          helpers:SmoothScroll.Enabled="True">
+                <StackPanel>
+                <!-- Grid of 5-wide rows. Horizontal scrolling must be DISABLED
+                     or the panel measures against infinite width and lays out
+                     one long strip (the field-reported horizontal scroll bug). -->
+                <ListBox ItemsSource="{Binding Results}"
+                         SelectedItem="{Binding Selected, Mode=TwoWay}"
+                         BorderThickness="0" Background="Transparent"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="5"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="2" ToolTip="{Binding Name}">
+                                <Path Data="{Binding Data}" Stretch="Uniform"
+                                      Width="30" Height="30" Margin="0,6,0,4"
+                                      Fill="{DynamicResource TextPrimaryBrush}"
+                                      HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding Name}" FontSize="9"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Button Content="Show more" Command="{Binding ShowMoreCommand}"
+                        HorizontalAlignment="Center" Padding="14,4" Margin="0,8,0,8"
+                        Visibility="{Binding CanShowMore, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Right: preview + per-target color tabs -->
+        <StackPanel Grid.Column="2">
+            <TextBlock Text="Preview" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,6"/>
+            <Border Width="132" Height="132" HorizontalAlignment="Left"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    CornerRadius="10" Background="{DynamicResource IconBoxBgBrush}">
+                <ContentControl x:Name="PreviewHost"/>
+            </Border>
+
+            <!-- One full picker per target: background tile and the glyph
+                 itself (which used to be white-only). -->
+            <TabControl Margin="0,12,0,0">
+                <TabItem Header="Background" ToolTip="{StaticResource Help.IconLibrary.Color}">
+                    <ctrl:ColorPickerPanel DataContext="{Binding Background}" Margin="0,8,0,0"/>
+                </TabItem>
+                <TabItem Header="Icon color" ToolTip="{StaticResource Help.IconLibrary.Color}">
+                    <ctrl:ColorPickerPanel DataContext="{Binding Glyph}" Margin="0,8,0,0"/>
+                </TabItem>
+            </TabControl>
+
+            <TextBlock Text="Rendered at 512×512 with the selected icon and background colors."
+                       FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Foreground="{DynamicResource TextMutedBrush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

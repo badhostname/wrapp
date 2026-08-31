@@ -1,0 +1,11 @@
+{
+  "TemplateName": "Required - Group",
+  "Description": "Required deployment to a specific collection with all notifications",
+  "Collection": "",
+  "DeployAction": "Install",
+  "DeployPurpose": "Required",
+  "UserNotification": "DisplayAll",
+  "TimeBaseOn": "LocalTime",
+  "AvailableDateTime": "0001-01-01T00:00:00.000Z",
+  "DeadlineDateTime": "2099-12-25T00:00:00.000Z"
+}
