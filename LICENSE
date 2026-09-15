@@ -1,0 +1,47 @@
+MIT License
+
+Copyright (c) 2026 badhostname
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Third-party components
+
+Wrapp bundles and builds against several third-party components, each under
+its own license. These are redistributed as part of the build output and
+must have their licenses preserved in any redistribution:
+
+| Component                               | License      | Notes                                   |
+|-----------------------------------------|--------------|-----------------------------------------|
+| Microsoft.Identity.Client (MSAL.NET, incl. .Broker + .Extensions.Msal) | MIT | NuGet packages         |
+| CommunityToolkit.Mvvm                   | MIT          | NuGet package                           |
+| MaterialDesignThemes                    | MIT          | NuGet package                           |
+| WPF-UI                                  | MIT          | NuGet package                           |
+| Microsoft.Web.WebView2                  | Microsoft SDK EULA | NuGet package — allows redistribution |
+| Microsoft.PowerShell.SDK                | MIT          | NuGet package                           |
+| Markdig.Signed                          | BSD-2-Clause | Transitive dependency of Microsoft.PowerShell.SDK |
+| Monaco Editor (vendored under Assets/)  | MIT          | Bundled offline copy                    |
+| Git-Windows-Minimal                     | GPL-2.0      | Binaries bundled for git operations     |
+| IntuneWin32App (vendored under modules/)| MIT          | MSEndpointMgr community module          |
+| PSAppDeployToolkit (vendored under modules/) | LGPL-2.1 | Deployment framework template           |
+
+Downstream redistributors are responsible for complying with each component's
+license terms. GPL-2.0 (git) and LGPL-2.1 (PSADT) impose additional obligations
+beyond the MIT license of Wrapp itself.
