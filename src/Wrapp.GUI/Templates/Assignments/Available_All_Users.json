@@ -1,0 +1,9 @@
+{
+  "TemplateName": "Available - All Users",
+  "Description": "Available install to all licensed users for self-service",
+  "Type": "AllUsers",
+  "Intent": "available",
+  "Notification": "showAll",
+  "DeliveryOptimizationPriority": "foreground",
+  "AvailableTime": "2099-12-25T00:00:00.000Z"
+}
