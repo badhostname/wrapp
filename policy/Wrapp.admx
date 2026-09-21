@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wrapp administrative template. Deploy with en-US\Wrapp.adml to the local
+  PolicyDefinitions folder or the domain Central Store, or ingest via Intune.
+  All policies write plain values under Software\Policies\Wrapp - exactly the
+  keys scripts/Apply-WrappPolicy.ps1 writes for offline fleets. The six
+  preference-default blocks (IntunePackageDefaults etc.) are administrable as
+  direct registry values (subkey per block); see docs/policy-admin-guide.md.
+  Contract-tested against the in-app PolicyCatalog (AdmxDriftTests).
+-->
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   revision="1.0" schemaVersion="1.0">
+  <policyNamespaces>
+    <target prefix="wrapp" namespace="Wrapp.Policies" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_Wrapp" displayName="$(string.SupportedWrapp)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="Wrapp" displayName="$(string.Cat_Wrapp)" />
+    <category name="Updates" displayName="$(string.Cat_Updates)"><parentCategory ref="Wrapp" /></category>
+    <category name="KeyVault" displayName="$(string.Cat_KeyVault)"><parentCategory ref="Wrapp" /></category>
+    <category name="Endpoints" displayName="$(string.Cat_Endpoints)"><parentCategory ref="Wrapp" /></category>
+    <category name="Bundle" displayName="$(string.Cat_Bundle)"><parentCategory ref="Wrapp" /></category>
+    <category name="Provisioning" displayName="$(string.Cat_Provisioning)"><parentCategory ref="Wrapp" /></category>
+    <category name="Appearance" displayName="$(string.Cat_Appearance)"><parentCategory ref="Wrapp" /></category>
+    <category name="Interface" displayName="$(string.Cat_Interface)"><parentCategory ref="Wrapp" /></category>
+    <category name="Diagnostics" displayName="$(string.Cat_Diagnostics)"><parentCategory ref="Wrapp" /></category>
+  </categories>
+  <policies>
+
+    <policy name="UpdateFeedUrl" class="Both" displayName="$(string.UpdateFeedUrl)"
+            explainText="$(string.UpdateFeedUrl_Explain)" presentation="$(presentation.TextPres_UpdateFeedUrl)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Updates" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="UpdateFeedUrl_Text" valueName="UpdateFeedUrl" required="true" /></elements>
+    </policy>
+
+    <policy name="UpdateMode" class="Both" displayName="$(string.UpdateMode)"
+            explainText="$(string.UpdateMode_Explain)" presentation="$(presentation.DropPres_UpdateMode)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Updates" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements>
+        <enum id="UpdateMode_Enum" valueName="UpdateMode" required="true">
+          <item displayName="$(string.UpdateMode_Auto)"><value><string>Auto</string></value></item>
+          <item displayName="$(string.UpdateMode_NotifyOnly)"><value><string>NotifyOnly</string></value></item>
+          <item displayName="$(string.UpdateMode_Disabled)"><value><string>Disabled</string></value></item>
+        </enum>
+      </elements>
+    </policy>
+
+    <policy name="KeyVaultRepoUrl" class="Both" displayName="$(string.KeyVaultRepoUrl)"
+            explainText="$(string.KeyVaultRepoUrl_Explain)" presentation="$(presentation.TextPres_KeyVaultRepoUrl)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="KeyVault" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="KeyVaultRepoUrl_Text" valueName="KeyVaultRepoUrl" required="true" /></elements>
+    </policy>
+
+    <policy name="EnableAzureDevOpsKeyVault" class="Both" displayName="$(string.EnableAzureDevOpsKeyVault)"
+            explainText="$(string.EnableAzureDevOpsKeyVault_Explain)"
+            key="Software\Policies\Wrapp" valueName="EnableAzureDevOpsKeyVault">
+      <parentCategory ref="KeyVault" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="KeyVaultUsePullRequests" class="Both" displayName="$(string.KeyVaultUsePullRequests)"
+            explainText="$(string.KeyVaultUsePullRequests_Explain)"
+            key="Software\Policies\Wrapp" valueName="KeyVaultUsePullRequests">
+      <parentCategory ref="KeyVault" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="KeyVaultPathTemplate" class="Both" displayName="$(string.KeyVaultPathTemplate)"
+            explainText="$(string.KeyVaultPathTemplate_Explain)" presentation="$(presentation.TextPres_KeyVaultPathTemplate)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="KeyVault" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="KeyVaultPathTemplate_Text" valueName="KeyVaultPathTemplate" required="true" /></elements>
+    </policy>
+
+    <policy name="KeyVaultManualPathTemplate" class="Both" displayName="$(string.KeyVaultManualPathTemplate)"
+            explainText="$(string.KeyVaultManualPathTemplate_Explain)" presentation="$(presentation.TextPres_KeyVaultManualPathTemplate)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="KeyVault" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="KeyVaultManualPathTemplate_Text" valueName="KeyVaultManualPathTemplate" required="true" /></elements>
+    </policy>
+
+    <policy name="EndpointTagFolder" class="Both" displayName="$(string.EndpointTagFolder)"
+            explainText="$(string.EndpointTagFolder_Explain)" presentation="$(presentation.TextPres_EndpointTagFolder)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Endpoints" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="EndpointTagFolder_Text" valueName="EndpointTagFolder" required="true" /></elements>
+    </policy>
+
+    <policy name="EndpointLocalAppFolder" class="Both" displayName="$(string.EndpointLocalAppFolder)"
+            explainText="$(string.EndpointLocalAppFolder_Explain)" presentation="$(presentation.TextPres_EndpointLocalAppFolder)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Endpoints" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="EndpointLocalAppFolder_Text" valueName="EndpointLocalAppFolder" required="true" /></elements>
+    </policy>
+
+    <policy name="PsadtTemplatePath" class="Both" displayName="$(string.PsadtTemplatePath)"
+            explainText="$(string.PsadtTemplatePath_Explain)" presentation="$(presentation.TextPres_PsadtTemplatePath)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Bundle" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="PsadtTemplatePath_Text" valueName="PsadtTemplatePath" required="true" /></elements>
+    </policy>
+
+    <policy name="DirectoryFormat" class="Both" displayName="$(string.DirectoryFormat)"
+            explainText="$(string.DirectoryFormat_Explain)" presentation="$(presentation.TextPres_DirectoryFormat)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Bundle" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="DirectoryFormat_Text" valueName="DirectoryFormat" required="true" /></elements>
+    </policy>
+
+    <policy name="IconFolderName" class="Both" displayName="$(string.IconFolderName)"
+            explainText="$(string.IconFolderName_Explain)" presentation="$(presentation.TextPres_IconFolderName)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Bundle" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="IconFolderName_Text" valueName="IconFolderName" required="true" /></elements>
+    </policy>
+
+    <policy name="Theme" class="Both" displayName="$(string.Theme)"
+            explainText="$(string.Theme_Explain)" presentation="$(presentation.TextPres_Theme)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Appearance" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="Theme_Text" valueName="Theme" required="true" /></elements>
+    </policy>
+
+    <policy name="ThemeFilePath" class="Both" displayName="$(string.ThemeFilePath)"
+            explainText="$(string.ThemeFilePath_Explain)" presentation="$(presentation.TextPres_ThemeFilePath)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Appearance" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="ThemeFilePath_Text" valueName="ThemeFilePath" required="true" /></elements>
+    </policy>
+
+    <policy name="OrgDefaultsPath" class="Both" displayName="$(string.OrgDefaultsPath)"
+            explainText="$(string.OrgDefaultsPath_Explain)" presentation="$(presentation.TextPres_OrgDefaultsPath)"
+            key="Software\Policies\Wrapp">
+      <parentCategory ref="Provisioning" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><text id="OrgDefaultsPath_Text" valueName="OrgDefaultsPath" required="true" /></elements>
+    </policy>
+
+    <policy name="DisableSettingsImport" class="Both" displayName="$(string.DisableSettingsImport)"
+            explainText="$(string.DisableSettingsImport_Explain)"
+            key="Software\Policies\Wrapp" valueName="DisableSettingsImport">
+      <parentCategory ref="Provisioning" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="DisableOrgDefaultsImport" class="Both" displayName="$(string.DisableOrgDefaultsImport)"
+            explainText="$(string.DisableOrgDefaultsImport_Explain)"
+            key="Software\Policies\Wrapp" valueName="DisableOrgDefaultsImport">
+      <parentCategory ref="Provisioning" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="VerboseUiTrace" class="Both" displayName="$(string.VerboseUiTrace)"
+            explainText="$(string.VerboseUiTrace_Explain)"
+            key="Software\Policies\Wrapp" valueName="VerboseUiTrace">
+      <parentCategory ref="Diagnostics" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="Placeholders" class="Both" displayName="$(string.Placeholders)"
+            explainText="$(string.Placeholders_Explain)" presentation="$(presentation.ListPres_Placeholders)"
+            key="Software\Policies\Wrapp\Placeholders">
+      <parentCategory ref="Provisioning" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><list id="Placeholders_List" key="Software\Policies\Wrapp\Placeholders" explicitValue="true" /></elements>
+    </policy>
+
+    <policy name="RedactionPatterns" class="Both" displayName="$(string.RedactionPatterns)"
+            explainText="$(string.RedactionPatterns_Explain)" presentation="$(presentation.ListPres_RedactionPatterns)"
+            key="Software\Policies\Wrapp\RedactionPatterns">
+      <parentCategory ref="Diagnostics" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><list id="RedactionPatterns_List" key="Software\Policies\Wrapp\RedactionPatterns" explicitValue="true" /></elements>
+    </policy>
+
+    <policy name="HiddenSections" class="Both" displayName="$(string.HiddenSections)"
+            explainText="$(string.HiddenSections_Explain)" presentation="$(presentation.ListPres_HiddenSections)"
+            key="Software\Policies\Wrapp\HiddenSections">
+      <parentCategory ref="Interface" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><list id="HiddenSections_List" key="Software\Policies\Wrapp\HiddenSections" explicitValue="true" /></elements>
+    </policy>
+
+    <policy name="HiddenSettingsTabs" class="Both" displayName="$(string.HiddenSettingsTabs)"
+            explainText="$(string.HiddenSettingsTabs_Explain)" presentation="$(presentation.ListPres_HiddenSettingsTabs)"
+            key="Software\Policies\Wrapp\HiddenSettingsTabs">
+      <parentCategory ref="Interface" /><supportedOn ref="SUPPORTED_Wrapp" />
+      <elements><list id="HiddenSettingsTabs_List" key="Software\Policies\Wrapp\HiddenSettingsTabs" explicitValue="true" /></elements>
+    </policy>
+
+  </policies>
+</policyDefinitions>

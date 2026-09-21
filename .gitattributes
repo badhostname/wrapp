@@ -1,0 +1,7 @@
+# Mark binary files so Git doesn't try to diff/merge them
+modules/psadt-template/Invoke-AppDeployToolkit.exe binary
+*.exe binary
+*.dll binary
+*.ico binary
+*.png binary
+*.ttf binary

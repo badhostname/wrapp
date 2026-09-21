@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Wrapp.GUI/Wrapp.GUI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Wrapp.GUI.Tests/Wrapp.GUI.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,60 @@
+{
+  "_comment": [
+    "Sample Wrapp policy file for Apply-WrappPolicy.ps1 (offline fleets).",
+    "Domain GPO / Intune ADMX write the same registry values; this file is",
+    "just the offline authoring format. Mandatory values are ENFORCED and",
+    "their controls disabled ('Managed by your organization'); Recommended",
+    "values seed defaults the user may change. Dotted keys become registry",
+    "subkeys. Restart Wrapp after applying.",
+    "Never policy-controllable: trust tokens, client secrets, gate state."
+  ],
+  "Mandatory": {
+    "UpdateFeedUrl": "\\\\fileserver\\wrapp\\releases",
+    "UpdateMode": "NotifyOnly",
+    "KeyVaultRepoUrl": "https://dev.azure.com/contoso/packaging/_git/wrapp-keys",
+    "EnableAzureDevOpsKeyVault": true,
+    "KeyVaultUsePullRequests": true,
+    "EndpointTagFolder": "C:\\ProgramData\\Contoso\\Tags",
+    "IntunePackageDefaults.InstallExperience": "system",
+    "DisableSettingsImport": true,
+    "OrgDefaultsPath": "C:\\ProgramData\\Wrapp\\defaults.local.json",
+    "ThemeFilePath": "C:\\ProgramData\\Wrapp\\contoso.wrapptheme.json"
+  },
+  "Recommended": {
+    "Theme": "Dark",
+    "DirectoryFormat": "{Company}\\{Name}\\{Version}"
+  },
+  "HiddenSections": [ "GitHistory" ],
+  "HiddenSettingsTabs": [ ],
+  "IntuneTenants": {
+    "11111111-2222-3333-4444-555555555555": {
+      "Name": "Contoso Production",
+      "Comment": "Primary tenant",
+      "ClientID": "66666666-7777-8888-9999-000000000000",
+      "AuthFlow": "Interactive",
+      "Architecture": "x64"
+    }
+  },
+  "SccmSites": {
+    "PS1": {
+      "Comment": "Primary site",
+      "AppFolder": "\\\\dist\\apps$",
+      "DeploymentGroups": [ "Pilot", "Broad" ]
+    }
+  },
+  "Domains": {
+    "contoso.com": {
+      "IsDistPath": "\\\\dist\\packages$",
+      "AppFolder": "Apps",
+      "TagFolder": "Tags"
+    }
+  },
+  "Placeholders": {
+    "SupportMail": "it-support@contoso.com",
+    "OrgShortName": "CONTOSO"
+  },
+  "RedactionPatterns": {
+    "InternalHosts": "\\\\\\\\dist\\\\[a-z$]+",
+    "TicketIds": "INC[0-9]{7}"
+  }
+}
