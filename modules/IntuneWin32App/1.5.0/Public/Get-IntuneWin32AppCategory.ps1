@@ -1,0 +1,93 @@
+function Get-IntuneWin32AppCategory {
+    <#
+    .SYNOPSIS
+        Get all available application categories.
+
+    .DESCRIPTION
+        Use this function to retrieve a list of available categories, or to check if a category exist by it's display name.
+
+    .PARAMETER DisplayName
+        Specify the display name of the category.
+
+    .PARAMETER List
+        Return all available categories.
+
+    .NOTES
+        Author:      Nickolaj Andersen
+        Contact:     @NickolajA
+        Created:     2023-01-29
+        Updated:     2023-09-04
+
+        Version history:
+        1.0.0 - (2023-01-29) Function created
+        1.0.1 - (2023-09-04) Updated with Test-AccessToken function
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [parameter(Mandatory = $true, ParameterSetName = "DisplayName", HelpMessage = "Specify the display name of the category.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$DisplayName,
+
+        [parameter(Mandatory = $true, ParameterSetName = "List", HelpMessage = "Return all available categories.")]
+        [ValidateNotNullOrEmpty()]
+        [switch]$List
+    )
+    Begin {
+        # Ensure required authentication header variable exists
+        if (-not (Test-AuthenticationState)) {
+            Write-Warning -Message "Authentication token was not found, use Connect-MSIntuneGraph before using this function"; break
+        }
+
+        # Set script variable for error action preference
+        $ErrorActionPreference = "Stop"
+    }
+    Process {
+        # Construct list for output of categories
+        $Win32AppCategoryList = New-Object -TypeName "System.Collections.ArrayList"
+
+        # Construct resource uri depending on parameter set name
+        switch ($PSCmdlet.ParameterSetName) {
+            "DisplayName" {
+                $Resource = "deviceAppManagement/mobileAppCategories?`$filter=displayName eq '$([System.Web.HttpUtility]::UrlEncode($DisplayName))'"
+            }
+            "List" {
+                $Resource = "deviceAppManagement/mobileAppCategories"
+            }
+        }
+
+        try {
+            # Invoke Graph API call to retrieve categories
+            $Win32AppCategories = Invoke-MSGraphOperation -Get -APIVersion "Beta" -Resource $Resource -ErrorAction "Stop"
+            if ($null -ne $Win32AppCategories -and $Win32AppCategories.Count -gt 0) {
+                foreach ($Win32AppCategory in $Win32AppCategories) {
+                    $PSObject = [PSCustomObject]@{
+                        ID = $Win32AppCategory.id
+                        DisplayName = $Win32AppCategory.displayName
+                        LastModifiedDateTime = $Win32AppCategory.lastModifiedDateTime
+                    }
+                    $Win32AppCategoryList.Add($PSObject) | Out-Null
+                }
+
+                # Handle return value
+                return $Win32AppCategoryList
+            }
+            else {
+                switch ($PSCmdlet.ParameterSetName) {
+                    "DisplayName" {
+                        Write-Verbose -Message "Could not find category with matching display name of '$($DisplayName)'"
+                    }
+                    "List" {
+                        Write-Verbose -Message "Empty response of categories from request"
+                    }
+                }
+                
+                # Return empty array for consistency
+                return @()
+            }
+        }
+        catch [System.Exception] {
+            Write-Warning -Message "An error occurred while retrieving categories. Error message: $($_.Exception.Message)"
+            return @()
+        }
+    }
+}

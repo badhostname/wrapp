@@ -1,0 +1,29 @@
+<UserControl x:Class="Wrapp.Controls.FieldLabelRow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+
+    <StackPanel Orientation="Horizontal">
+        <!-- Lock icon: shown when the field is disabled by a FieldRule -->
+        <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   Margin="0,0,4,0"
+                   VerticalAlignment="Center"
+                   Visibility="{Binding IsFieldEnabled, ElementName=Root,
+                                Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+        <TextBlock x:Name="LabelText"
+                   Style="{StaticResource FieldLabel}"
+                   Text="{Binding Text, ElementName=Root}"/>
+        <!-- Required-warning icon + label, shown when IsMissing is true -->
+        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                   Foreground="{DynamicResource WarningBrush}"
+                   VerticalAlignment="Center" Margin="4,0,0,0"
+                   Visibility="{Binding IsMissing, ElementName=Root,
+                                Converter={StaticResource BoolToVis}}"/>
+        <TextBlock Text="Required" FontSize="11"
+                   Foreground="{DynamicResource WarningBrush}"
+                   VerticalAlignment="Center" Margin="4,0,0,0"
+                   Visibility="{Binding IsMissing, ElementName=Root,
+                                Converter={StaticResource BoolToVis}}"/>
+    </StackPanel>
+</UserControl>
