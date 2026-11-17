@@ -1,0 +1,20 @@
+<UserControl x:Class="Wrapp.Controls.SectionHeader"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+        <TextBlock x:Name="TitleText"
+                   FontSize="13" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   VerticalAlignment="Center"/>
+        <Button x:Name="InfoButton"
+                Click="InfoButton_Click"
+                Background="Transparent" BorderThickness="0"
+                Padding="4,0" Margin="6,0,0,0"
+                Cursor="Hand" VerticalAlignment="Center"
+                ToolTip="Click for help on this section">
+            <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets"
+                       FontSize="12" Foreground="{DynamicResource TextMutedBrush}"/>
+        </Button>
+    </StackPanel>
+</UserControl>

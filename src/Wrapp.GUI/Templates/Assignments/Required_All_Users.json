@@ -1,0 +1,10 @@
+{
+  "TemplateName": "Required - All Users",
+  "Description": "Required install to all licensed users with all notifications",
+  "Type": "AllUsers",
+  "Intent": "required",
+  "Notification": "showAll",
+  "DeliveryOptimizationPriority": "foreground",
+  "AvailableTime": "0001-01-01T00:00:00.000Z",
+  "DeadlineTime": "2099-12-25T00:00:00.000Z"
+}

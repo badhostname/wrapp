@@ -1,0 +1,5 @@
+Wrapp is an application-packaging workbench for Intune and Configuration Manager: author a bundle once, produce both a Win32 .intunewin and an SCCM deployment type from the same detection rules, scripts, and metadata.
+
+This wizard installs Wrapp on your computer. You can install it for yourself only, or for everyone on this machine.
+
+On first launch, Wrapp offers to load your organization's defaults file if your IT team supplied one.

@@ -1,0 +1,83 @@
+<UserControl x:Class="Wrapp.Views.SaveTargetDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Width="640">
+
+    <StackPanel>
+
+        <!-- Location -->
+        <TextBlock Text="Location" Style="{StaticResource FieldLabel}"
+                   ToolTip="{StaticResource Help.SaveSheet.Location}"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ui:TextBox x:Name="LocationBox" Grid.Column="0" IsReadOnly="True"
+                        FontFamily="Consolas" FontSize="12"/>
+            <Button Grid.Column="2" Padding="12,5" Click="Browse_Click"
+                    ToolTip="{StaticResource Help.SaveSheet.Browse}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Browse..." VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+        <TextBlock x:Name="LocationHint" FontSize="11" Margin="0,4,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+
+        <!-- Mode -->
+        <RadioButton x:Name="ConventionRadio" GroupName="SaveTargetMode" Margin="0,14,0,0"
+                     Checked="Mode_Changed"
+                     ToolTip="{StaticResource Help.SaveSheet.Convention}">
+            <TextBlock Text="Create the folders from the naming convention" FontSize="13"/>
+        </RadioButton>
+        <StackPanel x:Name="ConventionPanel" Margin="28,6,0,0">
+            <ui:TextBox x:Name="RelativeBox" FontFamily="Consolas" FontSize="12"
+                        TextChanged="Relative_TextChanged"/>
+            <TextBlock x:Name="RelativeHint" FontSize="11" Margin="0,4,0,0"
+                       Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+            <TextBlock x:Name="MissingText" FontSize="11" Margin="0,2,0,0" Visibility="Collapsed"
+                       Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <RadioButton x:Name="DirectRadio" GroupName="SaveTargetMode" Margin="0,12,0,0"
+                     Checked="Mode_Changed"
+                     ToolTip="{StaticResource Help.SaveSheet.Direct}">
+            <TextBlock Text="Save directly into the location above" FontSize="13"/>
+        </RadioButton>
+        <TextBlock Text="for a folder you made yourself" FontSize="11" Margin="28,2,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+        <TextBlock x:Name="ManagedNote" FontSize="11" Margin="0,6,0,0" Visibility="Collapsed"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   Text="The choice between these two is managed by your organization."/>
+
+        <!-- Result -->
+        <Border Background="{DynamicResource InputBgBrush}" CornerRadius="4" Padding="10,8" Margin="0,16,0,0">
+            <StackPanel>
+                <TextBlock Text="Will save to" FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2"/>
+                <TextBlock x:Name="ResolvedText" FontFamily="Consolas" FontSize="12"
+                           Foreground="{DynamicResource AccentBgBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <TextBlock x:Name="ErrorText" FontSize="12" Margin="0,10,0,0" Visibility="Collapsed"
+                   Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"/>
+
+        <ItemsControl x:Name="WarningsList" Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource WarningBrush}">
+                        <Run Text="&#x25B2;"/><Run Text="  "/><Run Text="{Binding Mode=OneWay}"/>
+                    </TextBlock>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>

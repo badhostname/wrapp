@@ -1,0 +1,88 @@
+<ui:FluentWindow x:Class="Wrapp.Views.SaveTemplateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:helpers="clr-namespace:Wrapp.Helpers"
+        Width="480" SizeToContent="Height"
+        MaxHeight="680"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Icon="/Assets/burrito.ico"
+        Background="{DynamicResource AppBgBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Title bar -->
+        <ui:TitleBar Grid.Row="0" x:Name="WindowTitleBar"
+                     ShowMinimize="False" ShowMaximize="False"/>
+
+        <!-- Row 1: Form -->
+        <StackPanel Grid.Row="1" Margin="20,8,20,4">
+
+            <TextBlock Text="Template name" FontSize="12"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,0,0,4"/>
+            <TextBox x:Name="NameBox" FontSize="13" Padding="8,6"
+                     ToolTip="{StaticResource Help.SaveTemplate.Name}"
+                     TextChanged="NameBox_TextChanged"/>
+
+            <TextBlock Text="Description (optional)" FontSize="12"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,12,0,4"/>
+            <TextBox x:Name="DescriptionBox" FontSize="13" Padding="8,6"/>
+
+            <TextBlock x:Name="HintText" FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       Margin="0,12,0,0" Visibility="Collapsed"/>
+
+            <!-- Optional field picker (package templates) -->
+            <StackPanel x:Name="FieldsPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                <TextBlock Text="Fields to include" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,0,0,4"/>
+                <Border BorderBrush="{DynamicResource AppBorderBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Background="{DynamicResource CardBgBrush}"
+                        ToolTip="{StaticResource Help.SaveTemplate.Fields}">
+                    <ScrollViewer MaxHeight="240"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  helpers:SmoothScroll.Enabled="True"
+                                  Padding="8,4,12,4">
+                        <ItemsControl x:Name="FieldsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding Checked, Mode=TwoWay}"
+                                              Margin="0,3" FontSize="12"
+                                              VerticalContentAlignment="Center">
+                                        <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="360">
+                                            <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>
+                                            <Run Text=" = " Foreground="{DynamicResource TextMutedBrush}"/>
+                                            <Run Text="{Binding Display, Mode=OneWay}"
+                                                 Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </TextBlock>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Row 2: Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="20,12,20,16">
+            <Button x:Name="SaveButton" Content="Save" MinWidth="110"
+                    Padding="16,6" Margin="0,0,8,0" IsDefault="True"
+                    Click="SaveButton_Click"/>
+            <Button Content="Cancel" MinWidth="110" Padding="16,6"
+                    IsCancel="True" Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>
